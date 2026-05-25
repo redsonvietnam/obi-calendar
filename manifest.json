@@ -1,0 +1,9 @@
+{
+    "id": "obsidian-calendar-agent",
+    "name": "obsidian-calendar-agent",
+    "version": "0.0.1",
+    "minAppVersion": "1.5.0",
+    "description": "AI calendar assistant for Obsidian with Gemini and Google Calendar integration.",
+    "author": "calendar-agent",
+    "isDesktopOnly": false
+}

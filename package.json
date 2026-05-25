@@ -1,0 +1,25 @@
+{
+    "name": "obsidian-calendar-agent",
+    "version": "0.0.1",
+    "description": "Obsidian plugin: AI calendar assistant with Gemini + Google Calendar",
+    "main": "main.js",
+    "scripts": {
+        "build": "node esbuild.config.mjs production",
+        "dev": "node esbuild.config.mjs"
+    },
+    "keywords": [
+        "obsidian",
+        "plugin",
+        "calendar",
+        "gemini",
+        "google-calendar"
+    ],
+    "author": "calendar-agent",
+    "license": "MIT",
+    "devDependencies": {
+        "@types/node": "^20.14.11",
+        "esbuild": "^0.23.0",
+        "obsidian": "^1.6.7",
+        "typescript": "^5.5.4"
+    }
+}
