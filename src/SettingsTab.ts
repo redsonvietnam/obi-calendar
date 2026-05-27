@@ -113,6 +113,24 @@ export class SettingsTab extends PluginSettingTab {
                 })
             );
 
+        new Setting(containerEl)
+            .setName("Calendar refresh interval (seconds)")
+            .setDesc("Tự động làm mới lịch sau mỗi X giây (30-300s).")
+            .addText((text) =>
+                text
+                    .setPlaceholder("60")
+                    .setValue(String(this.plugin.settings.calendarRefreshInterval))
+                    .onChange(async (value) => {
+                        const numValue = parseInt(value.trim());
+                        if (isNaN(numValue) || numValue < 30 || numValue > 300) {
+                            new Notice("Khoảng thời gian làm mới phải là số từ 30 đến 300 giây.");
+                            return;
+                        }
+                        this.plugin.settings.calendarRefreshInterval = numValue;
+                        await this.plugin.savePluginSettings();
+                    })
+            );
+
         containerEl.createEl("h3", { text: "OAuth quick actions" });
 
         new Setting(containerEl)

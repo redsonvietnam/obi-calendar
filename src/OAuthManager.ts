@@ -1,4 +1,4 @@
-import { Notice, Platform } from "obsidian";
+import { Notice, Platform, requestUrl } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 import { OAuthTokenData } from "./types";
 
@@ -131,20 +131,21 @@ export class OAuthManager {
             body.set("client_secret", clientSecret);
         }
 
-        const response = await fetch(OAuthManager.GOOGLE_TOKEN_URL, {
+        const response = await requestUrl({
+            url: OAuthManager.GOOGLE_TOKEN_URL,
             method: "POST",
             headers: {
                 "Content-Type": "application/x-www-form-urlencoded"
             },
-            body: body.toString()
+            body: body.toString(),
+            throw: false
         });
 
-        if (!response.ok) {
-            const text = await response.text();
-            throw new Error(`[OAuthManager] exchange token failed: ${response.status} ${text}`);
+        if (response.status < 200 || response.status >= 300) {
+            throw new Error(`[OAuthManager] exchange token failed: ${response.status} ${response.text}`);
         }
 
-        const json = await response.json() as {
+        const json = response.json as {
             access_token: string;
             refresh_token?: string;
             token_type: string;
@@ -197,20 +198,21 @@ export class OAuthManager {
             body.set("client_secret", clientSecret);
         }
 
-        const response = await fetch(OAuthManager.GOOGLE_TOKEN_URL, {
+        const response = await requestUrl({
+            url: OAuthManager.GOOGLE_TOKEN_URL,
             method: "POST",
             headers: {
                 "Content-Type": "application/x-www-form-urlencoded"
             },
-            body: body.toString()
+            body: body.toString(),
+            throw: false
         });
 
-        if (!response.ok) {
-            const text = await response.text();
-            throw new Error(`[OAuthManager] refresh token failed: ${response.status} ${text}`);
+        if (response.status < 200 || response.status >= 300) {
+            throw new Error(`[OAuthManager] refresh token failed: ${response.status} ${response.text}`);
         }
 
-        const json = await response.json() as {
+        const json = response.json as {
             access_token: string;
             token_type: string;
             scope?: string;

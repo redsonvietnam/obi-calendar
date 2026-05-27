@@ -1,3 +1,4 @@
+import { normalizePath, TFile } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 import { GoogleCalendarAPI, ListEventsParams } from "./GoogleCalendarAPI";
 import { DEFAULT_TIMEZONE, GoogleCalendarEvent } from "./types";
@@ -52,7 +53,9 @@ export class CalendarTools {
             create_event: this.execCreateEvent.bind(this),
             update_event: this.execUpdateEvent.bind(this),
             delete_event: this.execDeleteEvent.bind(this),
-            get_vault_context: this.execGetVaultContext.bind(this)
+            get_vault_context: this.execGetVaultContext.bind(this),
+            write_vault_note: this.execWriteVaultNote.bind(this),
+            append_vault_note: this.execAppendVaultNote.bind(this)
         };
     }
 
@@ -154,6 +157,42 @@ export class CalendarTools {
                     type: "object",
                     properties: {},
                     required: []
+                }
+            },
+            {
+                name: "write_vault_note",
+                description: "Ghi đè hoặc tạo mới một ghi chú trong Obsidian vault với nội dung chỉ định",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        path: {
+                            type: "string",
+                            description: "Đường dẫn tương đối của file trong vault, ví dụ 'Daily/2026-05-27.md'"
+                        },
+                        content: {
+                            type: "string",
+                            description: "Nội dung markdown đầy đủ của file"
+                        }
+                    },
+                    required: ["path", "content"]
+                }
+            },
+            {
+                name: "append_vault_note",
+                description: "Thêm nội dung vào cuối một ghi chú đã có trong Obsidian vault",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        path: {
+                            type: "string",
+                            description: "Đường dẫn tương đối của file trong vault"
+                        },
+                        contentToAppend: {
+                            type: "string",
+                            description: "Nội dung cần chèn thêm vào cuối ghi chú"
+                        }
+                    },
+                    required: ["path", "contentToAppend"]
                 }
             }
         ];
@@ -329,6 +368,114 @@ export class CalendarTools {
 
     private async execGetVaultContext(): Promise<unknown> {
         return await this.vaultContext.buildSnapshot();
+    }
+
+    private async execWriteVaultNote(args: Record<string, unknown>): Promise<unknown> {
+        const path = this.asRequiredString(args.path, "path");
+        const content = this.asRequiredString(args.content, "content");
+
+        const accepted = await this.safetyLayer.confirm({
+            action: "write_note",
+            summary: `Ghi đè hoặc tạo ghi chú: ${path}`,
+            details: [`Đường dẫn: ${path}`, `Nội dung (rút gọn): ${this.truncate(content, 150)}`]
+        });
+        if (!accepted) {
+            throw new Error("Người dùng từ chối ghi ghi chú.");
+        }
+
+        const normalized = normalizePath(path);
+        const file = this.plugin.app.vault.getAbstractFileByPath(normalized);
+
+        let oldContent = "";
+        let isNew = true;
+
+        if (file instanceof TFile) {
+            oldContent = await this.plugin.app.vault.read(file);
+            isNew = false;
+            await this.plugin.app.vault.modify(file, content);
+        } else {
+            // Tự động tạo thư mục nếu chưa tồn tại
+            const parts = normalized.split("/");
+            if (parts.length > 1) {
+                const folderPath = parts.slice(0, -1).join("/");
+                if (!this.plugin.app.vault.getAbstractFileByPath(folderPath)) {
+                    await this.plugin.app.vault.createFolder(folderPath);
+                }
+            }
+            await this.plugin.app.vault.create(normalized, content);
+        }
+
+        this.safetyLayer.registerUndo({
+            id: `undo-write-note-${normalized}-${Date.now()}`,
+            label: `Hoàn tác ghi file ${path}`,
+            createdAt: new Date().toISOString(),
+            rollback: async () => {
+                const f = this.plugin.app.vault.getAbstractFileByPath(normalized);
+                if (f instanceof TFile) {
+                    if (isNew) {
+                        await this.plugin.app.vault.delete(f);
+                    } else {
+                        await this.plugin.app.vault.modify(f, oldContent);
+                    }
+                }
+            }
+        });
+
+        return { success: true, path: normalized, isNew };
+    }
+
+    private async execAppendVaultNote(args: Record<string, unknown>): Promise<unknown> {
+        const path = this.asRequiredString(args.path, "path");
+        const contentToAppend = this.asRequiredString(args.contentToAppend, "contentToAppend");
+
+        const accepted = await this.safetyLayer.confirm({
+            action: "write_note",
+            summary: `Thêm nội dung vào ghi chú: ${path}`,
+            details: [`Đường dẫn: ${path}`, `Nội dung thêm (rút gọn): ${this.truncate(contentToAppend, 150)}`]
+        });
+        if (!accepted) {
+            throw new Error("Người dùng từ chối thêm nội dung ghi chú.");
+        }
+
+        const normalized = normalizePath(path);
+        const file = this.plugin.app.vault.getAbstractFileByPath(normalized);
+
+        let oldContent = "";
+        let isNew = true;
+
+        if (file instanceof TFile) {
+            oldContent = await this.plugin.app.vault.read(file);
+            isNew = false;
+            const separator = oldContent.endsWith("\n") || oldContent.length === 0 ? "" : "\n";
+            await this.plugin.app.vault.modify(file, oldContent + separator + contentToAppend);
+        } else {
+            const parts = normalized.split("/");
+            if (parts.length > 1) {
+                const folderPath = parts.slice(0, -1).join("/");
+                if (!this.plugin.app.vault.getAbstractFileByPath(folderPath)) {
+                    await this.plugin.app.vault.createFolder(folderPath);
+                }
+            }
+            await this.plugin.app.vault.create(normalized, contentToAppend);
+        }
+
+        this.safetyLayer.registerUndo({
+            id: `undo-append-note-${normalized}-${Date.now()}`,
+            label: `Hoàn tác thêm nội dung file ${path}`,
+            createdAt: new Date().toISOString(),
+            rollback: async () => {
+                const f = this.plugin.app.vault.getAbstractFileByPath(normalized);
+                if (f instanceof TFile) {
+                    if (isNew) {
+                        await this.plugin.app.vault.delete(f);
+                    } else {
+                        await this.plugin.app.vault.modify(f, oldContent);
+                    }
+                }
+            }
+        });
+
+        return { success: true, path: normalized, isNew };
     }
 
     private buildSafetyDetails(calendarId: string, event: Partial<GoogleCalendarEvent>): string[] {

@@ -1,3 +1,4 @@
+import { requestUrl, RequestUrlResponse } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 import { OAuthManager } from "./OAuthManager";
 import {
@@ -124,14 +125,16 @@ export class GoogleCalendarAPI {
             requestBody = JSON.stringify(body);
         }
 
-        const response = await fetch(url, {
+        const response = await requestUrl({
+            url,
             method,
             headers,
-            body: requestBody
+            body: requestBody,
+            throw: false
         });
 
-        if (!response.ok) {
-            const apiError = await this.parseApiError(response);
+        if (response.status < 200 || response.status >= 300) {
+            const apiError = this.parseApiError(response);
             const err = new Error(
                 `[GoogleCalendarAPI] ${method} ${path} failed: ${apiError.code} ${apiError.message}`
             ) as Error & { apiError?: GoogleCalendarApiError };
@@ -143,20 +146,20 @@ export class GoogleCalendarAPI {
             return undefined as T;
         }
 
-        return await response.json() as T;
+        return response.json as T;
     }
 
     /**
      * Chuẩn hóa lỗi trả về từ Google API để debug dễ hơn.
      */
-    private async parseApiError(response: Response): Promise<GoogleCalendarApiError> {
+    private parseApiError(response: RequestUrlResponse): GoogleCalendarApiError {
         const fallback: GoogleCalendarApiError = {
             code: response.status,
-            message: response.statusText || "Unknown Google API error"
+            message: "Unknown Google API error"
         };
 
         try {
-            const json = await response.json() as {
+            const json = response.json as {
                 error?: {
                     code?: number;
                     message?: string;

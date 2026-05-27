@@ -37,6 +37,7 @@ export interface CalendarAgentSettings {
     googleRedirectUri: string;
     autoOpenSidebarOnStart: boolean;
     requireSafetyConfirm: boolean;
+    calendarRefreshInterval: number; // in seconds
 }
 
 export const DEFAULT_SETTINGS: CalendarAgentSettings = {
@@ -46,7 +47,8 @@ export const DEFAULT_SETTINGS: CalendarAgentSettings = {
     googleClientSecret: "",
     googleRedirectUri: "",
     autoOpenSidebarOnStart: false,
-    requireSafetyConfirm: true
+    requireSafetyConfirm: true,
+    calendarRefreshInterval: 60, // Default to 60 seconds
 };
 
 export interface OAuthTokenData {

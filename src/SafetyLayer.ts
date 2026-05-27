@@ -1,7 +1,7 @@
 import { Modal, Notice } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 
-export type SafetyActionType = "create_event" | "update_event" | "delete_event";
+export type SafetyActionType = "create_event" | "update_event" | "delete_event" | "write_note";
 
 export interface SafetyConfirmRequest {
     action: SafetyActionType;

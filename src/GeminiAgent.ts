@@ -1,3 +1,4 @@
+import { requestUrl } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 import {
     CalendarTools,
@@ -175,20 +176,22 @@ export class GeminiAgent {
 
         for (const model of GeminiAgent.MODEL_CANDIDATES) {
             const endpoint = `${GeminiAgent.API_BASE_URL}/models/${model}:generateContent`;
-            const response = await fetch(endpoint, {
+            const response = await requestUrl({
+                url: endpoint,
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "x-goog-api-key": apiKey
                 },
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
+                throw: false
             });
 
-            if (response.ok) {
-                return await response.json() as GeminiGenerateContentResponse;
+            if (response.status >= 200 && response.status < 300) {
+                return response.json as GeminiGenerateContentResponse;
             }
 
-            const text = await response.text();
+            const text = response.text;
             const normalized = text.toLowerCase();
             const isQuotaError =
                 response.status === 429 ||
