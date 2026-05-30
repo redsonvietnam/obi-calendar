@@ -5,23 +5,7 @@ import {
     ToolCallRequest,
     ToolExecutionResult
 } from "./CalendarTools";
-
-interface GeminiPart {
-    text?: string;
-    functionCall?: {
-        name: string;
-        args?: Record<string, unknown>;
-    };
-    functionResponse?: {
-        name: string;
-        response: Record<string, unknown>;
-    };
-}
-
-interface GeminiContent {
-    role: "user" | "model" | "tool";
-    parts: GeminiPart[];
-}
+import { GeminiContent, GeminiPart } from "./types";
 
 interface GeminiCandidate {
     content?: GeminiContent;
@@ -74,6 +58,47 @@ export class GeminiAgent {
         this.tools = tools;
     }
 
+    private buildSystemPrompt(timezone: string, vaultSnapshot: string): string {
+        return `
+Bạn là "Calendar Agent", một trợ lý AI thông minh được tích hợp vào Obsidian.
+Mục tiêu chính của bạn là giúp người dùng quản lý Google Calendar và Obsidian Vault bằng cách phân tích ghi chú và sắp xếp lịch trình.
+
+Thời gian hiện tại: ${new Date().toLocaleString('vi-VN')}
+Timezone người dùng: ${timezone}
+
+BỐI CẢNH VAULT (VAULT CONTEXT):
+${vaultSnapshot}
+
+KHẢ NĂNG CỦA BẠN:
+1. **Quản lý Google Calendar**: Liệt kê, tạo, cập nhật, vá (patch) và xóa sự kiện.
+2. **Quản lý Google Tasks**: Liệt kê danh sách task, tạo, cập nhật và xóa các công việc trong Google Tasks.
+3. **Phân tích ghi chú**: Bạn có thể đọc và phân tích các ghi chú hỗn loạn để trích xuất sự kiện, deadline và công việc.
+4. **Nhận thức Vault**: Bạn có quyền truy cập vào Daily Notes, các Task đang mở và các ghi chú dự án.
+
+HƯỚNG DẪN:
+- **Ngôn ngữ**: Sử dụng tiếng Việt cho tất cả các giao tiếp.
+- **Deep Linking**: Khi tạo hoặc cập nhật sự kiện/task từ một ghi chú, **LUÔN LUÔN** cung cấp \`sourceNotePath\` (đường dẫn file Obsidian) để tạo liên kết sâu (deep link).
+- **Cập nhật thông minh**: Khi người dùng muốn thay đổi sự kiện/task (VD: "dời lịch họp mai sang 3h chiều"), hãy:
+    1. Sử dụng \`list_events\` hoặc \`list_tasks\` để tìm đúng sự kiện/task đó và lấy \`eventId\` hoặc \`taskId\`.
+    2. Sử dụng \`update_event\` hoặc \`patch_task\` với thông tin mới.
+- **Kiểm tra xung đột (Conflict Detection)**: Trước khi tạo một sự kiện mới, hãy **LUÔN LUÔN** sử dụng \`list_events\` để kiểm tra xem khung giờ đó đã có sự kiện nào khác chưa. Nếu có xung đột, hãy thông báo cho người dùng và đề xuất một khung giờ trống thay thế.
+- **Phân loại Thông minh**:
+    - **Sự kiện (Calendar)**: Dùng cho các cuộc hẹn, cuộc họp, hoặc sự kiện có thời gian bắt đầu và kết thúc cụ thể.
+    - **Công việc (Tasks)**: Dùng cho các đầu việc cần hoàn thành, deadline, hoặc các mục "to-do" không nhất thiết phải chiếm một khối thời gian cố định trên lịch.
+- **Lập lịch thông minh**: Nếu ngày tháng mang tính tương đối (VD: "mai", "thứ 6 tới"), hãy tính toán dựa trên Thời gian hiện tại.
+- **Xác nhận**: Đối với nhiều sự kiện, hãy liệt kê rõ ràng và hỏi ý kiến người dùng trước khi tạo.
+- **Cập nhật ghi chú**: Khi người dùng yêu cầu phân tích/dọn dẹp một ghi chú, hãy **chủ động** sử dụng công cụ \`write_vault_note\` để sắp xếp lại nội dung ghi chú một cách khoa học và dùng \`append_vault_note\` để lưu lại danh sách sự kiện đã tạo ở cuối ghi chú.
+
+HƯỚNG DẪN CỤ THỂ CHO GHI CHÚ HỖN LOẠN:
+- Tìm kiếm các từ khóa như "họp", "deadline", "gặp", "đi", "làm", "xong".
+- Suy luận ngày tháng từ ngữ cảnh nếu có thể (VD: nếu ghi chú là Daily Note, hãy giả định là "hôm nay").
+- Nếu ghi chú chứa danh sách các task không có thời gian, hãy đề xuất các khối thời gian hợp lý hoặc đặt chúng là sự kiện cả ngày trên Google Calendar.
+- Sau khi phân tích và tạo lịch, hãy sử dụng \`write_vault_note\` để tổ chức lại ghi chú đó: thêm phần lịch trình đã đồng bộ hóa vào ghi chú gốc để người dùng biết lịch trình đã được liên kết thành công.
+
+Hãy ngắn gọn, hữu ích và tập trung vào việc giảm bớt gánh nặng ghi nhớ cho người dùng.
+`;
+    }
+
     /**
      * Chạy vòng lặp agent:
      * 1) gửi user message
@@ -81,13 +106,27 @@ export class GeminiAgent {
      * 3) gửi functionResponse lại cho model
      * 4) lặp đến khi model trả text cuối
      */
-    async run(userMessage: string): Promise<AgentRunResult> {
+    async run(
+        userMessage: string,
+        history: GeminiContent[] = [],
+        timezone: string,
+        vaultSnapshot: string,
+        signal?: AbortSignal,
+        excludedTools?: string[]
+    ): Promise<AgentRunResult & { updatedHistory: GeminiContent[] }> {
         const apiKey = this.plugin.settings.geminiApiKey?.trim();
         if (!apiKey) {
             throw new Error("Thiếu Gemini API key trong settings.");
         }
 
+        const systemTurn: GeminiContent = {
+            role: "user",
+            parts: [{ text: this.buildSystemPrompt(timezone, vaultSnapshot) }]
+        };
+
         const contents: GeminiContent[] = [
+            systemTurn, // Prepend system prompt
+            ...history,
             {
                 role: "user",
                 parts: [{ text: userMessage }]
@@ -98,7 +137,11 @@ export class GeminiAgent {
         const maxToolRounds = 6;
 
         for (let round = 0; round < maxToolRounds; round += 1) {
-            const response = await this.generateContent(apiKey, contents);
+            if (signal?.aborted) {
+                throw new Error("Operation cancelled by user.");
+            }
+
+            const response = await this.generateContent(apiKey, contents, excludedTools);
             const candidate = response.candidates?.[0];
             const modelContent = candidate?.content;
 
@@ -113,7 +156,9 @@ export class GeminiAgent {
                 const finalText = this.extractTextFromContent(modelContent);
                 return {
                     assistantText: finalText || "Đã xử lý xong.",
-                    toolTrace
+                    toolTrace,
+                    // Exclude systemTurn from updatedHistory
+                    updatedHistory: contents.slice(1)
                 };
             }
 
@@ -122,6 +167,11 @@ export class GeminiAgent {
                 name: fn.name,
                 arguments: fn.args ?? {}
             };
+
+            // Check for abortion before executing tool
+            if (signal?.aborted) {
+                throw new Error("Operation cancelled by user.");
+            }
 
             const toolResult = await this.tools.executeTool(call);
             toolTrace.push({
@@ -156,13 +206,14 @@ export class GeminiAgent {
 
     private async generateContent(
         apiKey: string,
-        contents: GeminiContent[]
+        contents: GeminiContent[],
+        excludedTools?: string[]
     ): Promise<GeminiGenerateContentResponse> {
         const body = {
             contents,
             tools: [
                 {
-                    functionDeclarations: this.tools.getGeminiToolDeclarations()
+                    functionDeclarations: this.tools.getGeminiToolDeclarations(excludedTools)
                 }
             ],
             toolConfig: {

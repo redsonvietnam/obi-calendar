@@ -58,12 +58,13 @@ export class VaultContext {
 
     private async readDailyNotes(): Promise<VaultDailyNoteContext[]> {
         const markdownFiles = this.plugin.app.vault.getMarkdownFiles();
+        const dailyNotesFolder = this.plugin.settings.dailyNotesFolder.toLowerCase();
         const candidates = markdownFiles.filter((file) => {
             const lowerPath = file.path.toLowerCase();
             const fileName = file.basename;
-            const isDailyFolder = lowerPath.includes("daily");
+            const isInDailyFolder = dailyNotesFolder && lowerPath.startsWith(dailyNotesFolder + "/");
             const isDateName = /^\d{4}-\d{2}-\d{2}$/.test(fileName);
-            return isDailyFolder || isDateName;
+            return isInDailyFolder || isDateName;
         });
 
         const sorted = candidates
@@ -113,10 +114,11 @@ export class VaultContext {
 
     private async readProjects(): Promise<VaultProjectNoteContext[]> {
         const markdownFiles = this.plugin.app.vault.getMarkdownFiles();
+        const projectNotesFolder = this.plugin.settings.projectNotesFolder.toLowerCase();
         const projectCandidates = markdownFiles
             .filter((file) => {
                 const lower = file.path.toLowerCase();
-                return lower.includes("project/") || lower.includes("projects/");
+                return projectNotesFolder && lower.startsWith(projectNotesFolder + "/");
             })
             .sort((a, b) => b.stat.mtime - a.stat.mtime)
             .slice(0, 10);

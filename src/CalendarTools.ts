@@ -1,9 +1,11 @@
 import { normalizePath, TFile } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 import { GoogleCalendarAPI, ListEventsParams } from "./GoogleCalendarAPI";
-import { DEFAULT_TIMEZONE, GoogleCalendarEvent } from "./types";
+import { GoogleTasksAPI, ListTaskListsParams, ListTasksParams } from "./GoogleTasksAPI"; // Import GoogleTasksAPI and its types
+import { DEFAULT_TIMEZONE, GoogleCalendarEvent, GoogleTask, GoogleTaskList } from "./types"; // Import GoogleTask and GoogleTaskList
 import { VaultContext } from "./VaultContext";
 import { SafetyLayer } from "./SafetyLayer";
+import { OAuthManager } from "./OAuthManager"; // Import OAuthManager
 
 export interface ToolDefinition {
     name: string;
@@ -25,8 +27,10 @@ export interface ToolExecutionResult {
 export interface CalendarToolsDependencies {
     plugin: ObsidianCalendarAgentPlugin;
     calendarApi: GoogleCalendarAPI;
+    googleTasksApi: GoogleTasksAPI; // Add GoogleTasksAPI
     vaultContext: VaultContext;
     safetyLayer: SafetyLayer;
+    oauthManager: OAuthManager; // Add OAuthManager for GoogleTasksAPI initialization
 }
 
 type ToolExecutor = (args: Record<string, unknown>) => Promise<unknown>;
@@ -40,11 +44,14 @@ export class CalendarTools {
     private readonly calendarApi: GoogleCalendarAPI;
     private readonly vaultContext: VaultContext;
     private readonly safetyLayer: SafetyLayer;
+    private readonly googleTasksApi: GoogleTasksAPI; // Add GoogleTasksAPI instance
     private readonly executors: Record<string, ToolExecutor>;
 
     constructor(deps: CalendarToolsDependencies) {
         this.plugin = deps.plugin;
         this.calendarApi = deps.calendarApi;
+        // Initialize GoogleTasksAPI with OAuthManager
+        this.googleTasksApi = new GoogleTasksAPI(deps.plugin, deps.oauthManager);
         this.vaultContext = deps.vaultContext;
         this.safetyLayer = deps.safetyLayer;
 
@@ -55,14 +62,34 @@ export class CalendarTools {
             delete_event: this.execDeleteEvent.bind(this),
             get_vault_context: this.execGetVaultContext.bind(this),
             write_vault_note: this.execWriteVaultNote.bind(this),
-            append_vault_note: this.execAppendVaultNote.bind(this)
+            append_vault_note: this.execAppendVaultNote.bind(this),
+            // Google Tasks tools
+            list_task_lists: this.execListTaskLists.bind(this),
+            create_task_list: this.execCreateTaskList.bind(this),
+            delete_task_list: this.execDeleteTaskList.bind(this),
+            list_tasks: this.execListTasks.bind(this),
+            create_task: this.execCreateTask.bind(this),
+            update_task: this.execUpdateTask.bind(this),
+            patch_task: this.execPatchTask.bind(this),
+            delete_task: this.execDeleteTask.bind(this)
         };
     }
 
     /**
      * Định nghĩa tools theo schema Gemini function calling.
      */
-    getGeminiToolDeclarations(): ToolDefinition[] {
+    getGeminiToolDeclarations(excludeTools?: string[]): ToolDefinition[] {
+        let decls = [
+            ...this.getCalendarToolDeclarations(),
+            ...this.getGoogleTasksToolDeclarations()
+        ];
+        if (excludeTools && excludeTools.length > 0) {
+            decls = decls.filter(d => !excludeTools.includes(d.name));
+        }
+        return decls;
+    }
+
+    private getCalendarToolDeclarations(): ToolDefinition[] {
         return [
             {
                 name: "list_events",
@@ -115,6 +142,10 @@ export class CalendarTools {
                         timeZone: {
                             type: "string",
                             description: "IANA timezone, mặc định Asia/Ho_Chi_Minh"
+                        },
+                        sourceNotePath: {
+                            type: "string",
+                            description: "Đường dẫn file Obsidian nguồn để tạo deep link"
                         }
                     },
                     required: ["summary", "startDateTime", "endDateTime"]
@@ -133,7 +164,11 @@ export class CalendarTools {
                         location: { type: "string" },
                         startDateTime: { type: "string" },
                         endDateTime: { type: "string" },
-                        timeZone: { type: "string" }
+                        timeZone: { type: "string" },
+                        sourceNotePath: {
+                            type: "string",
+                            description: "Đường dẫn file Obsidian nguồn để cập nhật deep link"
+                        }
                     },
                     required: ["eventId"]
                 }
@@ -198,6 +233,130 @@ export class CalendarTools {
         ];
     }
 
+    private getGoogleTasksToolDeclarations(): ToolDefinition[] {
+        return [
+            {
+                name: "list_task_lists",
+                description: "Liệt kê các danh sách task trên Google Tasks",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        maxResults: { type: "number", description: "Số lượng danh sách task tối đa" }
+                    },
+                    required: []
+                }
+            },
+            {
+                name: "create_task_list",
+                description: "Tạo một danh sách task mới trên Google Tasks",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        title: { type: "string", description: "Tiêu đề của danh sách task" }
+                    },
+                    required: ["title"]
+                }
+            },
+            {
+                name: "delete_task_list",
+                description: "Xóa một danh sách task trên Google Tasks",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        tasklistId: { type: "string", description: "ID của danh sách task cần xóa" }
+                    },
+                    required: ["tasklistId"]
+                }
+            },
+            {
+                name: "list_tasks",
+                description: "Liệt kê các task trong một danh sách task trên Google Tasks",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        tasklistId: { type: "string", description: "ID của danh sách task. Mặc định là 'default' hoặc danh sách chính." },
+                        maxResults: { type: "number", description: "Số lượng task tối đa" },
+                        showCompleted: { type: "boolean", description: "Bao gồm các task đã hoàn thành" },
+                        showDeleted: { type: "boolean", description: "Bao gồm các task đã xóa" },
+                        showHidden: { type: "boolean", description: "Bao gồm các task ẩn" },
+                        sortBy: { type: "string", enum: ["newList", "due", "updated"], description: "Cách sắp xếp task" }
+                    },
+                    required: []
+                }
+            },
+            {
+                name: "create_task",
+                description: "Tạo một task mới trong danh sách task trên Google Tasks",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        tasklistId: { type: "string", description: "ID của danh sách task. Nếu bỏ trống sẽ dùng danh sách mặc định." },
+                        title: { type: "string", description: "Tiêu đề của task" },
+                        notes: { type: "string", description: "Ghi chú chi tiết cho task" },
+                        due: { type: "string", description: "Ngày hết hạn của task (RFC3339)" },
+                        sourceNotePath: {
+                            type: "string",
+                            description: "Đường dẫn file Obsidian nguồn để tạo deep link"
+                        }
+                    },
+                    required: ["title"]
+                }
+            },
+            {
+                name: "update_task",
+                description: "Cập nhật một task đã có trên Google Tasks (thay thế toàn bộ)",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        tasklistId: { type: "string", description: "ID của danh sách task" },
+                        taskId: { type: "string", description: "ID của task cần cập nhật" },
+                        title: { type: "string", description: "Tiêu đề mới của task" },
+                        notes: { type: "string", description: "Ghi chú mới cho task" },
+                        due: { type: "string", description: "Ngày hết hạn mới của task (RFC3339)" },
+                        status: { type: "string", enum: ["needsAction", "completed"], description: "Trạng thái của task" },
+                        sourceNotePath: {
+                            type: "string",
+                            description: "Đường dẫn file Obsidian nguồn để cập nhật deep link"
+                        }
+                    },
+                    required: ["tasklistId", "taskId"]
+                }
+            },
+            {
+                name: "patch_task",
+                description: "Cập nhật một phần một task đã có trên Google Tasks",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        tasklistId: { type: "string", description: "ID của danh sách task" },
+                        taskId: { type: "string", description: "ID của task cần cập nhật" },
+                        title: { type: "string", description: "Tiêu đề mới của task" },
+                        notes: { type: "string", description: "Ghi chú mới cho task" },
+                        due: { type: "string", description: "Ngày hết hạn mới của task (RFC3339)" },
+                        status: { type: "string", enum: ["needsAction", "completed"], description: "Trạng thái của task" },
+                        sourceNotePath: {
+                            type: "string",
+                            description: "Đường dẫn file Obsidian nguồn để cập nhật deep link"
+                        }
+                    },
+                    required: ["tasklistId", "taskId"]
+                }
+            },
+            {
+                name: "delete_task",
+                description: "Xóa một task trên Google Tasks",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        tasklistId: { type: "string", description: "ID của danh sách task" },
+                        taskId: { type: "string", description: "ID của task cần xóa" }
+                    },
+                    required: ["tasklistId", "taskId"]
+                }
+            }
+        ];
+    }
+
     async executeTool(call: ToolCallRequest): Promise<ToolExecutionResult> {
         try {
             const toolName = call.name?.trim();
@@ -247,10 +406,18 @@ export class CalendarTools {
         const endDateTime = this.asRequiredString(args.endDateTime, "endDateTime");
         const calendarId = this.asOptionalString(args.calendarId) ?? "primary";
         const timeZone = this.asOptionalString(args.timeZone) ?? this.getTimezone();
+        const sourceNotePath = this.asOptionalString(args.sourceNotePath);
+
+        let description = this.asOptionalString(args.description);
+        if (sourceNotePath) {
+            const vaultName = this.plugin.app.vault.getName();
+            const uri = `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(sourceNotePath)}`;
+            description = (description ? description + "\n\n" : "") + `Source Note: ${uri}`;
+        }
 
         const event: GoogleCalendarEvent = {
             summary,
-            description: this.asOptionalString(args.description),
+            description,
             location: this.asOptionalString(args.location),
             start: {
                 dateTime: startDateTime,
@@ -294,10 +461,20 @@ export class CalendarTools {
 
         const existing = await this.calendarApi.getEvent(calendarId, eventId);
 
+        const sourceNotePath = this.asOptionalString(args.sourceNotePath);
+        let description = this.asOptionalString(args.description) ?? existing.description;
+        if (sourceNotePath) {
+            const vaultName = this.plugin.app.vault.getName();
+            const uri = `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(sourceNotePath)}`;
+            if (!description?.includes(uri)) {
+                description = (description ? description + "\n\n" : "") + `Source Note: ${uri}`;
+            }
+        }
+
         const merged: GoogleCalendarEvent = {
             ...existing,
             summary: this.asOptionalString(args.summary) ?? existing.summary,
-            description: this.asOptionalString(args.description) ?? existing.description,
+            description,
             location: this.asOptionalString(args.location) ?? existing.location,
             start: {
                 ...existing.start,
@@ -364,6 +541,112 @@ export class CalendarTools {
         });
 
         return { deleted: true, calendarId, eventId };
+    }
+
+    private async execListTaskLists(args: Record<string, unknown>): Promise<unknown> {
+        const params: ListTaskListsParams = {
+            maxResults: this.asOptionalNumber(args.maxResults)
+        };
+        return await this.googleTasksApi.listTaskLists(params);
+    }
+
+    private async execCreateTaskList(args: Record<string, unknown>): Promise<unknown> {
+        const title = this.asRequiredString(args.title, "title");
+        return await this.googleTasksApi.createTaskList(title);
+    }
+
+    private async execDeleteTaskList(args: Record<string, unknown>): Promise<unknown> {
+        const tasklistId = this.asRequiredString(args.tasklistId, "tasklistId");
+        await this.googleTasksApi.deleteTaskList(tasklistId);
+        return { deleted: true, tasklistId };
+    }
+
+    private async execListTasks(args: Record<string, unknown>): Promise<unknown> {
+        const params: ListTasksParams = {
+            tasklist: this.asOptionalString(args.tasklistId) ?? "@default",
+            maxResults: this.asOptionalNumber(args.maxResults),
+            showCompleted: this.asOptionalBoolean(args.showCompleted),
+            showDeleted: this.asOptionalBoolean(args.showDeleted),
+            showHidden: this.asOptionalBoolean(args.showHidden),
+            sortBy: this.asOptionalString(args.sortBy) as ListTasksParams["sortBy"]
+        };
+        return await this.googleTasksApi.listTasks(params);
+    }
+
+    private async execCreateTask(args: Record<string, unknown>): Promise<unknown> {
+        const tasklistId = this.asOptionalString(args.tasklistId) ?? "@default";
+        const sourceNotePath = this.asOptionalString(args.sourceNotePath);
+
+        let notes = this.asOptionalString(args.notes);
+        if (sourceNotePath) {
+            const vaultName = this.plugin.app.vault.getName();
+            const uri = `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(sourceNotePath)}`;
+            notes = (notes ? notes + "\n\n" : "") + `Source Note: ${uri}`;
+        }
+
+        const task: Partial<GoogleTask> = {
+            title: this.asRequiredString(args.title, "title"),
+            notes,
+            due: this.asOptionalString(args.due)
+        };
+        return await this.googleTasksApi.createTask(tasklistId, task);
+    }
+
+    private async execUpdateTask(args: Record<string, unknown>): Promise<unknown> {
+        const tasklistId = this.asRequiredString(args.tasklistId, "tasklistId");
+        const taskId = this.asRequiredString(args.taskId, "taskId");
+        const sourceNotePath = this.asOptionalString(args.sourceNotePath);
+
+        // We need to get the existing task to avoid duplicating the link
+        const existing = await this.googleTasksApi.getTask(tasklistId, taskId);
+        let notes = this.asOptionalString(args.notes) ?? existing.notes;
+        if (sourceNotePath) {
+            const vaultName = this.plugin.app.vault.getName();
+            const uri = `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(sourceNotePath)}`;
+            if (!notes?.includes(uri)) {
+                notes = (notes ? notes + "\n\n" : "") + `Source Note: ${uri}`;
+            }
+        }
+
+        const task: Partial<GoogleTask> = {
+            title: this.asOptionalString(args.title),
+            notes,
+            due: this.asOptionalString(args.due),
+            status: this.asOptionalString(args.status) as GoogleTask["status"]
+        };
+        return await this.googleTasksApi.updateTask(tasklistId, taskId, task);
+    }
+
+    private async execPatchTask(args: Record<string, unknown>): Promise<unknown> {
+        const tasklistId = this.asRequiredString(args.tasklistId, "tasklistId");
+        const taskId = this.asRequiredString(args.taskId, "taskId");
+        const sourceNotePath = this.asOptionalString(args.sourceNotePath);
+
+        const existing = await this.googleTasksApi.getTask(tasklistId, taskId);
+        let notes = this.asOptionalString(args.notes);
+        if (sourceNotePath) {
+            const vaultName = this.plugin.app.vault.getName();
+            const uri = `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(sourceNotePath)}`;
+            const currentNotes = notes ?? existing.notes;
+            if (!currentNotes?.includes(uri)) {
+                notes = (currentNotes ? currentNotes + "\n\n" : "") + `Source Note: ${uri}`;
+            }
+        }
+
+        const partialTask: Partial<GoogleTask> = {
+            title: this.asOptionalString(args.title),
+            notes,
+            due: this.asOptionalString(args.due),
+            status: this.asOptionalString(args.status) as GoogleTask["status"]
+        };
+        return await this.googleTasksApi.patchTask(tasklistId, taskId, partialTask);
+    }
+
+    private async execDeleteTask(args: Record<string, unknown>): Promise<unknown> {
+        const tasklistId = this.asRequiredString(args.tasklistId, "tasklistId");
+        const taskId = this.asRequiredString(args.taskId, "taskId");
+        await this.googleTasksApi.deleteTask(tasklistId, taskId);
+        return { deleted: true, tasklistId, taskId };
     }
 
     private async execGetVaultContext(): Promise<unknown> {
@@ -521,6 +804,16 @@ export class CalendarTools {
         if (typeof value === "string" && value.trim().length > 0) {
             const n = Number(value);
             if (Number.isFinite(n)) return n;
+        }
+        return undefined;
+    }
+
+    private asOptionalBoolean(value: unknown): boolean | undefined {
+        if (typeof value === "boolean") return value;
+        if (typeof value === "string") {
+            const lower = value.trim().toLowerCase();
+            if (lower === "true") return true;
+            if (lower === "false") return false;
         }
         return undefined;
     }

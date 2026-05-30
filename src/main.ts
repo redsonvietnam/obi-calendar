@@ -1,7 +1,8 @@
 import {
     Notice,
     Plugin,
-    WorkspaceLeaf
+    WorkspaceLeaf,
+    TFile
 } from "obsidian";
 import {
     CalendarAgentSettings,
@@ -9,12 +10,14 @@ import {
 } from "./types";
 import { OAuthManager } from "./OAuthManager";
 import { GoogleCalendarAPI } from "./GoogleCalendarAPI";
+import { GoogleTasksAPI } from "./GoogleTasksAPI"; // Import GoogleTasksAPI
 import { CalendarTools } from "./CalendarTools";
 import { GeminiAgent } from "./GeminiAgent";
 import { CalendarView } from "./CalendarView";
 import { VaultContext } from "./VaultContext";
 import { SafetyLayer } from "./SafetyLayer";
 import { SettingsTab } from "./SettingsTab";
+import { SyncManager } from "./SyncManager";
 
 export const VIEW_TYPE_CALENDAR_AGENT = "obsidian-calendar-agent-view";
 
@@ -22,10 +25,12 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
     settings: CalendarAgentSettings = DEFAULT_SETTINGS;
     oauthManager!: OAuthManager;
     googleCalendarApi!: GoogleCalendarAPI;
+    googleTasksApi!: GoogleTasksAPI; // Add googleTasksApi property
     calendarTools!: CalendarTools;
     geminiAgent!: GeminiAgent;
     vaultContext!: VaultContext;
     safetyLayer!: SafetyLayer;
+    syncManager!: SyncManager;
 
     async onload(): Promise<void> {
         try {
@@ -35,16 +40,21 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
             await this.oauthManager.initialize();
 
             this.googleCalendarApi = new GoogleCalendarAPI(this, this.oauthManager);
+            this.googleTasksApi = new GoogleTasksAPI(this, this.oauthManager); // Initialize GoogleTasksAPI
             this.vaultContext = new VaultContext(this);
             this.safetyLayer = new SafetyLayer(this);
 
             this.calendarTools = new CalendarTools({
                 plugin: this,
                 calendarApi: this.googleCalendarApi,
+                googleTasksApi: this.googleTasksApi,
+                oauthManager: this.oauthManager,
                 vaultContext: this.vaultContext,
                 safetyLayer: this.safetyLayer
             });
             this.geminiAgent = new GeminiAgent(this, this.calendarTools);
+            this.syncManager = new SyncManager(this, this.googleTasksApi, this.googleCalendarApi);
+            this.syncManager.startAutoSync();
 
             this.addSettingTab(new SettingsTab(this.app, this));
 
@@ -122,12 +132,35 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
             });
 
             this.addCommand({
+                id: "google-tasks-list-test",
+                name: "Calendar Agent: Test list tasks (Google Tasks)",
+                callback: async () => {
+                    try {
+                        const tasks = await this.googleTasksApi.listTasks({ maxResults: 10 });
+                        new Notice(`List tasks OK. Số task nhận được: ${tasks.length}`);
+                        console.log("[obsidian-calendar-agent] listTasks result:", tasks);
+                    } catch (error) {
+                        console.error("[obsidian-calendar-agent] list tasks test failed", error);
+                        new Notice(`List tasks lỗi: ${(error as Error).message}`);
+                    }
+                }
+            });
+
+            this.addCommand({
                 id: "gemini-hardcoded-tool-test",
                 name: "Calendar Agent: Test Gemini Function Calling (hardcoded)",
                 callback: async () => {
                     try {
                         const hardcodedMessage = "Hãy liệt kê 5 sự kiện sắp tới trong lịch của tôi.";
-                        const result = await this.geminiAgent.run(hardcodedMessage);
+                        const timezone = this.settings.timezone || "Asia/Ho_Chi_Minh";
+                        const vaultSnapshot = JSON.stringify(await this.vaultContext.buildSnapshot(), null, 2);
+
+                        const result = await this.geminiAgent.run(
+                            hardcodedMessage,
+                            [],
+                            timezone,
+                            vaultSnapshot
+                        );
 
                         console.log("[obsidian-calendar-agent] Gemini hardcoded test result:", result);
                         new Notice(
@@ -173,10 +206,53 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
                 }
             });
 
+            this.addCommand({
+                id: "process-current-note",
+                name: "📋 Phân tích ghi chú hiện tại với AI",
+                callback: () => this.processCurrentNote()
+            });
+
+            this.addCommand({
+                id: "scan-inbox-folder",
+                name: "📥 Quét và xử lý ghi chú trong Inbox",
+                callback: () => this.scanInbox()
+            });
+
+            this.addCommand({
+                id: "sync-now",
+                name: "🔄 Đồng bộ ngay bây giờ (Sync Now)",
+                callback: async () => {
+                    new Notice("Đang đồng bộ dữ liệu từ Google...");
+                    try {
+                        const results = await this.syncManager.syncAll();
+                        new Notice(`Đồng bộ xong! Tasks: ${results.tasksUpdated}, Calendar: ${results.calendarUpdated}`);
+                    } catch (error) {
+                        new Notice(`Lỗi đồng bộ: ${(error as Error).message}`);
+                    }
+                }
+            });
+
             // Tự mở sidebar nếu user bật setting này
             if (this.settings.autoOpenSidebarOnStart) {
                 await this.activateView();
             }
+
+            // Lắng nghe sự kiện tạo/di chuyển file vào Inbox
+            this.registerEvent(
+                this.app.vault.on("create", (file) => {
+                    if (file instanceof TFile) {
+                        this.handleInboxFile(file);
+                    }
+                })
+            );
+
+            this.registerEvent(
+                this.app.vault.on("rename", (file) => {
+                    if (file instanceof TFile) {
+                        this.handleInboxFile(file);
+                    }
+                })
+            );
         } catch (error) {
             console.error("[obsidian-calendar-agent] onload failed", error);
             new Notice("Calendar Agent: Plugin load thất bại. Xem console để biết chi tiết.");
@@ -189,6 +265,81 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
             await this.app.workspace.detachLeavesOfType(VIEW_TYPE_CALENDAR_AGENT);
         } catch (error) {
             console.error("[obsidian-calendar-agent] onunload failed", error);
+        }
+    }
+
+    getCalendarView(): CalendarView | null {
+        const { workspace } = this.app;
+        const leaf = workspace.getLeavesOfType(VIEW_TYPE_CALENDAR_AGENT)[0];
+        if (leaf && leaf.view instanceof CalendarView) {
+            return leaf.view;
+        }
+        return null;
+    }
+
+    async processCurrentNote(): Promise<void> {
+        const view = this.getCalendarView();
+        if (view) {
+            await view.processNoteProposal();
+        } else {
+            new Notice("Calendar Agent sidebar chưa mở. Vui lòng mở sidebar trước.");
+        }
+    }
+
+    async scanInbox(): Promise<void> {
+        const inboxFolder = this.settings.inboxFolder;
+        if (!inboxFolder) {
+            new Notice("Chưa cấu hình Inbox Folder trong Settings.");
+            return;
+        }
+
+        const files = this.app.vault.getFiles().filter(f => f.path.startsWith(inboxFolder));
+        if (files.length === 0) {
+            new Notice(`Không tìm thấy ghi chú nào trong folder: ${inboxFolder}`);
+            return;
+        }
+
+        const view = this.getCalendarView();
+        if (!view) {
+            new Notice("Calendar Agent sidebar chưa mở. Vui lòng mở sidebar trước.");
+            return;
+        }
+
+        new Notice(`Đang quét ${files.length} ghi chú trong ${inboxFolder}...`);
+
+        for (const file of files) {
+            const content = await this.app.vault.read(file);
+            const prompt = [
+                `Tôi muốn bạn xử lý ghi chú từ Inbox này:`,
+                `File: ${file.path}`,
+                `Nội dung:`,
+                `---`,
+                content,
+                `---`,
+                `Yêu cầu:`,
+                `1. Phân tích nội dung để trích xuất sự kiện và công việc.`,
+                `2. Đưa vào Google Calendar/Tasks.`,
+                `3. Sắp xếp lại nội dung file này trong Obsidian bằng \`write_vault_note\`.`,
+                `4. Tóm tắt kết quả.`
+            ].join('\n');
+
+            await view.sendMessage(prompt);
+        }
+    }
+
+    async handleInboxFile(file: TFile): Promise<void> {
+        const inboxFolder = this.settings.inboxFolder;
+        if (!inboxFolder || !file.path.startsWith(inboxFolder)) {
+            return;
+        }
+
+        new Notice(`📥 Phát hiện ghi chú mới trong Inbox: ${file.name}`);
+
+        const view = this.getCalendarView();
+        if (view) {
+            await view.sendMessage(
+                `Tôi thấy bạn vừa thêm ghi chú "${file.name}" vào Inbox. Bạn có muốn tôi phân tích và sắp xếp nó ngay bây giờ không?`
+            );
         }
     }
 
@@ -239,6 +390,11 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
             const base = (await this.loadData()) ?? {};
             base.settings = this.settings;
             await this.saveData(base);
+
+            // Restart auto-sync to apply new settings (interval, enabled, etc.)
+            if (this.syncManager) {
+                this.syncManager.startAutoSync();
+            }
         } catch (error) {
             console.error("[obsidian-calendar-agent] save settings failed", error);
             new Notice("Calendar Agent: Không lưu được settings.");

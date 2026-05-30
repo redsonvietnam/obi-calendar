@@ -6,13 +6,13 @@
 :root {
     --oca-spacing-xs: 4px;
     --oca-spacing-sm: 8px;
-    --oca-spacing-md: 16px;
-    --oca-spacing-lg: 24px;
-    --oca-radius-sm: 8px;
-    --oca-radius-md: 12px;
-    --oca-radius-lg: 16px;
-    --oca-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
-    --oca-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --oca-spacing-md: 12px;
+    --oca-spacing-lg: 20px;
+    --oca-radius-sm: 6px;
+    --oca-radius-md: 10px;
+    --oca-radius-lg: 14px;
+    --oca-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.08);
+    --oca-shadow-md: 0 3px 10px rgba(0, 0, 0, 0.12);
     --oca-event-blue: #4285f4;
     --oca-event-green: #0b8043;
     --oca-event-red: #d50000;
@@ -38,49 +38,77 @@
    ============================================ */
 
 .oca-chat-header {
-    padding: var(--oca-spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--oca-spacing-sm);
+    padding: 6px var(--oca-spacing-md);
     border-bottom: 1px solid var(--divider-color);
     background-color: var(--background-secondary);
     flex-shrink: 0;
 }
 
 .oca-chat-header h3 {
-    margin: 0 0 var(--oca-spacing-xs) 0;
-    font-size: 16px;
+    margin: 0;
+    font-size: 14px;
     font-weight: 600;
     color: var(--text-normal);
 }
 
 .oca-chat-header p {
     margin: 0;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-muted);
+    flex: 1;
+}
+
+.oca-chat-header .oca-header-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.oca-header-btn {
+    padding: 2px 8px;
+    border: 1px solid var(--divider-color);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    line-height: 1.6;
+}
+
+.oca-header-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
 }
 
 /* Tab navigation */
 .oca-tabs {
     display: flex;
-    gap: var(--oca-spacing-md);
-    padding: var(--oca-spacing-md);
+    padding: 0 var(--oca-spacing-sm);
     border-bottom: 1px solid var(--divider-color);
     background-color: var(--background-secondary);
     flex-shrink: 0;
 }
 
 .oca-tab {
-    padding: var(--oca-spacing-sm) var(--oca-spacing-md);
+    padding: 6px 12px;
     border: none;
     background: transparent;
     color: var(--text-muted);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     cursor: pointer;
     border-bottom: 2px solid transparent;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
+    margin-bottom: -1px;
 }
 
 .oca-tab:hover {
     color: var(--text-normal);
+    background: var(--background-modifier-hover);
 }
 
 .oca-tab.active {
@@ -102,6 +130,51 @@
 }
 
 /* ============================================
+   QUICK ACTION PILLS
+   ============================================ */
+
+.oca-quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px var(--oca-spacing-sm);
+    border-bottom: 1px solid var(--divider-color);
+    flex-shrink: 0;
+}
+
+.oca-pill {
+    padding: 2px 10px;
+    border: 1px solid var(--divider-color);
+    border-radius: 12px;
+    background: var(--background-primary);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    line-height: 1.6;
+}
+
+.oca-pill:hover {
+    border-color: var(--interactive-accent);
+    color: var(--interactive-accent);
+    background: rgba(var(--interactive-accent-rgb, 66, 133, 244), 0.05);
+}
+
+.oca-pill-primary {
+    background: var(--interactive-accent);
+    color: white;
+    border-color: var(--interactive-accent);
+}
+
+.oca-pill-primary:hover {
+    opacity: 0.9;
+    color: white;
+    background: var(--interactive-accent);
+}
+
+/* ============================================
    CHAT INTERFACE
    ============================================ */
 
@@ -109,14 +182,14 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: var(--oca-spacing-md);
+    padding: 8px 10px;
     display: flex;
     flex-direction: column;
-    gap: var(--oca-spacing-md);
+    gap: 4px;
 }
 
 .oca-chat-messages::-webkit-scrollbar {
-    width: 6px;
+    width: 5px;
 }
 
 .oca-chat-messages::-webkit-scrollbar-track {
@@ -141,21 +214,21 @@
     padding: var(--oca-spacing-lg);
     text-align: center;
     color: var(--text-muted);
-    font-size: 14px;
-    line-height: 1.6;
+    font-size: 13px;
+    line-height: 1.5;
 }
 
 /* Message container */
 .oca-msg {
     display: flex;
-    margin-bottom: var(--oca-spacing-sm);
-    animation: slideIn 0.3s ease-out;
+    margin-bottom: 2px;
+    animation: slideIn 0.15s ease-out;
 }
 
 @keyframes slideIn {
     from {
         opacity: 0;
-        transform: translateY(8px);
+        transform: translateY(6px);
     }
 
     to {
@@ -175,43 +248,81 @@
 
 /* Message metadata */
 .oca-msg-meta {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-bottom: var(--oca-spacing-xs);
-    padding: 0 var(--oca-spacing-sm);
+    font-size: 10px;
+    color: var(--text-faint);
+    margin-bottom: 2px;
+    padding: 0 4px;
 }
 
 /* Message body */
 .oca-msg-body {
-    max-width: 85%;
-    padding: var(--oca-spacing-sm) var(--oca-spacing-md);
-    border-radius: var(--oca-radius-md);
+    max-width: 80%;
+    padding: 5px 10px;
+    border-radius: 8px;
     word-wrap: break-word;
     white-space: pre-wrap;
     font-size: 13px;
     line-height: 1.5;
 }
 
+.oca-msg-body p {
+    margin: 3px 0;
+}
+
+.oca-msg-body ul,
+.oca-msg-body ol {
+    margin: 2px 0;
+    padding-left: 18px;
+}
+
+.oca-msg-body li {
+    margin: 1px 0;
+}
+
+.oca-msg-body h1,
+.oca-msg-body h2,
+.oca-msg-body h3,
+.oca-msg-body h4 {
+    margin: 5px 0 2px 0;
+    font-size: inherit;
+    font-weight: 600;
+}
+
+.oca-msg-body > :first-child {
+    margin-top: 0;
+}
+
+.oca-msg-body > :last-child {
+    margin-bottom: 0;
+}
+
+.oca-msg-body code {
+    font-size: 12px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: var(--background-modifier-hover);
+}
+
 .oca-msg-user .oca-msg-body {
     background-color: var(--interactive-accent);
     color: white;
-    border-radius: var(--oca-radius-lg) var(--oca-radius-sm) var(--oca-radius-sm) var(--oca-radius-lg);
+    border-radius: 12px 4px 4px 12px;
 }
 
 .oca-msg-assistant .oca-msg-body {
     background-color: var(--background-secondary);
     color: var(--text-normal);
-    border-radius: var(--oca-radius-sm) var(--oca-radius-lg) var(--oca-radius-lg) var(--oca-radius-sm);
+    border-radius: 4px 12px 12px 4px;
     border: 1px solid var(--divider-color);
 }
 
 .oca-msg-tool .oca-msg-body {
     background-color: var(--background-tertiary);
     color: var(--text-muted);
-    border-left: 3px solid var(--text-muted);
-    border-radius: var(--oca-radius-sm);
-    font-family: "Courier New", monospace;
-    font-size: 12px;
+    border-left: 2px solid var(--text-muted);
+    border-radius: 4px;
+    font-family: var(--font-monospace);
+    font-size: 11px;
 }
 
 /* ============================================
@@ -219,80 +330,112 @@
    ============================================ */
 
 .oca-chat-composer {
-    padding: var(--oca-spacing-md);
+    padding: 6px 10px;
     border-top: 1px solid var(--divider-color);
     background-color: var(--background-secondary);
     flex-shrink: 0;
+}
+
+.oca-input-wrap {
     display: flex;
-    flex-direction: column;
-    gap: var(--oca-spacing-sm);
+    gap: 6px;
+    align-items: flex-end;
+    background: var(--background-primary);
+    border: 1px solid var(--divider-color);
+    border-radius: 10px;
+    padding: 4px 4px 4px 10px;
+    transition: border-color 0.2s;
+}
+
+.oca-input-wrap:focus-within {
+    border-color: var(--interactive-accent);
 }
 
 .oca-chat-input {
-    width: 100%;
-    padding: var(--oca-spacing-sm) var(--oca-spacing-md);
-    border: 1px solid var(--divider-color);
-    border-radius: var(--oca-radius-md);
-    background-color: var(--background-primary);
+    flex: 1;
+    border: none;
+    background: transparent;
     color: var(--text-normal);
     font-family: var(--font-text-family);
     font-size: 13px;
     resize: none;
     max-height: 120px;
-    transition: border-color 0.2s ease;
+    padding: 4px 0;
+    line-height: 1.5;
 }
 
 .oca-chat-input:focus {
     outline: none;
-    border-color: var(--interactive-accent);
-    background-color: var(--background-primary);
 }
 
 .oca-chat-input::placeholder {
-    color: var(--text-muted);
+    color: var(--text-faint);
 }
 
 .oca-chat-input:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
 /* Send button */
 .oca-chat-send {
-    padding: var(--oca-spacing-sm) var(--oca-spacing-md);
+    padding: 4px 14px;
     border: none;
-    border-radius: var(--oca-radius-md);
+    border-radius: 7px;
     background-color: var(--interactive-accent);
     color: white;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
     flex-shrink: 0;
+    line-height: 1.6;
 }
 
 .oca-chat-send:hover:not(:disabled) {
     opacity: 0.9;
-    box-shadow: var(--oca-shadow-sm);
 }
 
 .oca-chat-send:active:not(:disabled) {
-    transform: scale(0.98);
+    transform: scale(0.97);
 }
 
 .oca-chat-send:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
+}
+
+/* Stop button */
+.oca-chat-stop {
+    padding: 4px 14px;
+    border: none;
+    border-radius: 7px;
+    background-color: var(--text-error);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+    line-height: 1.6;
+}
+
+.oca-chat-stop:hover {
+    opacity: 0.9;
+}
+
+.oca-chat-stop:active {
+    transform: scale(0.97);
 }
 
 /* Status bar */
 .oca-chat-status {
-    padding: var(--oca-spacing-xs) var(--oca-spacing-md);
-    font-size: 12px;
-    color: var(--text-muted);
+    padding: 2px 10px;
+    font-size: 11px;
+    color: var(--text-faint);
     background-color: var(--background-secondary);
     border-top: 1px solid var(--divider-color);
-    min-height: 20px;
+    min-height: 18px;
     flex-shrink: 0;
 }
 
@@ -310,16 +453,15 @@
 .oca-calendar-header {
     display: flex;
     align-items: center;
-    gap: var(--oca-spacing-sm);
-    padding: var(--oca-spacing-sm) var(--oca-spacing-md);
+    gap: 6px;
+    padding: 4px 10px;
     border-bottom: 1px solid var(--divider-color);
     background-color: var(--background-secondary);
     flex-shrink: 0;
-    flex-wrap: wrap;
 }
 
 .oca-calendar-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text-normal);
     margin: 0;
@@ -337,15 +479,15 @@
 }
 
 .oca-nav-btn {
-    padding: 4px 8px;
+    padding: 3px 7px;
     border: 1px solid var(--divider-color);
-    border-radius: var(--oca-radius-sm);
+    border-radius: 4px;
     background-color: var(--background-primary);
     color: var(--text-normal);
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
-    transition: all 0.15s ease;
-    line-height: 1;
+    transition: all 0.12s ease;
+    line-height: 1.4;
 }
 
 .oca-nav-btn:hover {
@@ -370,7 +512,7 @@
 .oca-view-modes {
     display: flex;
     gap: 2px;
-    padding: var(--oca-spacing-xs) var(--oca-spacing-md);
+    padding: 3px 10px;
     border-bottom: 1px solid var(--divider-color);
     background-color: var(--background-secondary);
     flex-shrink: 0;
@@ -378,24 +520,24 @@
 
 .oca-view-mode-btn {
     flex: 1;
-    padding: 6px 4px;
+    padding: 4px 4px;
     border: 1px solid var(--divider-color);
     background-color: var(--background-primary);
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.12s ease;
     text-align: center;
     border-radius: 0;
 }
 
 .oca-view-mode-btn:first-child {
-    border-radius: var(--oca-radius-sm) 0 0 var(--oca-radius-sm);
+    border-radius: 4px 0 0 4px;
 }
 
 .oca-view-mode-btn:last-child {
-    border-radius: 0 var(--oca-radius-sm) var(--oca-radius-sm) 0;
+    border-radius: 0 4px 4px 0;
 }
 
 .oca-view-mode-btn:hover {
@@ -1336,32 +1478,67 @@
 }
 
 /* ============================================
-   QUICK ACTIONS
+   TASKS PANEL
    ============================================ */
 
-.oca-quick-actions {
+.oca-tasks-container {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--oca-spacing-sm);
-    padding: var(--oca-spacing-md);
+    flex-direction: column;
+    height: 100%;
+    padding: 10px;
+    gap: 8px;
 }
 
-.oca-quick-action-btn {
-    padding: var(--oca-spacing-xs) var(--oca-spacing-sm);
+.oca-tasks-container h4 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.oca-tasks-controls {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.oca-tasks-select {
+    flex: 1;
+    padding: 3px 6px;
     border: 1px solid var(--divider-color);
-    border-radius: var(--oca-radius-sm);
-    background-color: var(--background-secondary);
+    border-radius: 4px;
+    background: var(--background-primary);
     color: var(--text-normal);
     font-size: 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    white-space: nowrap;
 }
 
-.oca-quick-action-btn:hover {
-    background-color: var(--interactive-accent);
-    color: white;
-    border-color: var(--interactive-accent);
+.oca-tasks-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.oca-task-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    transition: background 0.12s;
+    cursor: default;
+}
+
+.oca-task-item:hover {
+    background: var(--background-modifier-hover);
+}
+
+.oca-task-due {
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-left: auto;
 }
 
 /* ============================================
@@ -1400,4 +1577,160 @@
 .theme-light {
     --oca-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
     --oca-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   AI PROPOSAL (collapsible editable suggestion)
+   ============================================ */
+
+.oca-msg-proposal {
+    max-width: 100% !important;
+    margin: 0 !important;
+}
+
+.oca-msg-proposal .oca-msg-meta {
+    display: none;
+}
+
+.oca-msg-proposal .oca-msg-body {
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0;
+    background: var(--background-primary) !important;
+    border: 1px solid var(--divider-color) !important;
+    border-radius: 8px !important;
+    overflow: hidden;
+}
+
+/* Header bar — always visible, clickable */
+.oca-proposal-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s;
+}
+
+.oca-proposal-header:hover {
+    background: var(--background-modifier-hover);
+}
+
+.oca-proposal-toggle {
+    font-size: 9px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: transform 0.15s;
+}
+
+.oca-proposal-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-normal);
+    flex-shrink: 0;
+}
+
+.oca-proposal-preview {
+    font-size: 11px;
+    color: var(--text-faint);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.oca-proposal-header-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.oca-proposal-header-actions .oca-pill {
+    padding: 1px 8px;
+    font-size: 10px;
+    line-height: 1.6;
+}
+
+/* Collapsible content wrapper */
+.oca-proposal-content {
+    max-height: 600px;
+    overflow: hidden;
+    transition: max-height 0.2s ease;
+}
+
+.oca-proposal-content.collapsed {
+    max-height: 0;
+}
+
+.oca-proposal-inner {
+    padding: 8px;
+    border-top: 1px solid var(--divider-color);
+}
+
+.oca-proposal-textarea {
+    width: 100%;
+    min-height: 100px;
+    max-height: 300px;
+    padding: 6px 8px;
+    border: 1px solid var(--divider-color);
+    border-radius: 6px;
+    background-color: var(--background-secondary);
+    color: var(--text-normal);
+    font-family: var(--font-monospace);
+    font-size: 12px;
+    line-height: 1.5;
+    resize: vertical;
+    box-sizing: border-box;
+    transition: border-color 0.15s;
+}
+
+.oca-proposal-textarea:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    background-color: var(--background-primary);
+}
+
+.oca-proposal-buttons {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    justify-content: flex-end;
+}
+
+.oca-proposal-save {
+    padding: 3px 12px;
+    border: none;
+    border-radius: 5px;
+    background-color: var(--interactive-accent);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    line-height: 1.6;
+}
+
+.oca-proposal-save:hover {
+    opacity: 0.9;
+}
+
+.oca-proposal-cancel {
+    padding: 3px 12px;
+    border: 1px solid var(--divider-color);
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    line-height: 1.6;
+}
+
+.oca-proposal-cancel:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
 }

@@ -131,6 +131,106 @@ export class SettingsTab extends PluginSettingTab {
                     })
             );
 
+        // Add settings for daily notes and project notes folders
+        new Setting(containerEl)
+            .setName("Daily Notes Folder")
+            .setDesc("Folder chứa các Daily Notes của bạn.")
+            .addText((text) =>
+                text
+                    .setPlaceholder("Daily")
+                    .setValue(this.plugin.settings.dailyNotesFolder)
+                    .onChange(async (value) => {
+                        this.plugin.settings.dailyNotesFolder = value.trim();
+                        await this.plugin.savePluginSettings();
+                    })
+            );
+
+        new Setting(containerEl)
+            .setName("Project Notes Folder")
+            .setDesc("Folder chứa các Project Notes của bạn.")
+            .addText((text) =>
+                text
+                    .setPlaceholder("Projects")
+                    .setValue(this.plugin.settings.projectNotesFolder)
+                    .onChange(async (value) => {
+                        this.plugin.settings.projectNotesFolder = value.trim();
+                        await this.plugin.savePluginSettings();
+                    })
+            );
+
+        // Add setting for Inbox Folder
+        new Setting(containerEl)
+            .setName("Inbox Folder")
+            .setDesc("Folder chứa các ghi chú hỗn loạn cần AI xử lý.")
+            .addText((text) =>
+                text
+                    .setPlaceholder("Inbox")
+                    .setValue(this.plugin.settings.inboxFolder)
+                    .onChange(async (value) => {
+                        this.plugin.settings.inboxFolder = value.trim();
+                        await this.plugin.savePluginSettings();
+                    })
+            );
+
+        containerEl.createEl("h3", { text: "Cấu hình Đồng bộ 2 chiều (Sync)" });
+
+        new Setting(containerEl)
+            .setName("Bật Tự động Đồng bộ")
+            .setDesc("Tự động đồng bộ các thay đổi từ Google về Obsidian theo chu kỳ")
+            .addToggle((toggle) =>
+                toggle
+                    .setValue(this.plugin.settings.sync.enabled)
+                    .onChange(async (value) => {
+                        this.plugin.settings.sync.enabled = value;
+                        await this.plugin.savePluginSettings();
+                        this.display(); // Refresh UI to show/hide interval settings
+                    })
+            );
+
+        if (this.plugin.settings.sync.enabled) {
+            new Setting(containerEl)
+                .setName("Chu kỳ đồng bộ (phút)")
+                .setDesc("Khoảng thời gian giữa các lần tự động đồng bộ (tối thiểu 5 phút)")
+                .addText((text) =>
+                    text
+                        .setPlaceholder("15")
+                        .setValue(String(this.plugin.settings.sync.intervalMinutes))
+                        .onChange(async (value) => {
+                            const numValue = parseInt(value.trim());
+                            if (isNaN(numValue) || numValue < 5) {
+                                new Notice("Chu kỳ đồng bộ phải là số từ 5 phút trở lên.");
+                                return;
+                            }
+                            this.plugin.settings.sync.intervalMinutes = numValue;
+                            await this.plugin.savePluginSettings();
+                        })
+                );
+        }
+
+        new Setting(containerEl)
+            .setName("Đồng bộ Google Tasks")
+            .setDesc("Cập nhật trạng thái hoàn thành của Task từ Google Tasks về Obsidian")
+            .addToggle((toggle) =>
+                toggle
+                    .setValue(this.plugin.settings.sync.syncTasks)
+                    .onChange(async (value) => {
+                        this.plugin.settings.sync.syncTasks = value;
+                        await this.plugin.savePluginSettings();
+                    })
+            );
+
+        new Setting(containerEl)
+            .setName("Đồng bộ Google Calendar")
+            .setDesc("Cập nhật các sự kiện từ Google Calendar vào Daily Note (chưa hỗ trợ đầy đủ)")
+            .addToggle((toggle) =>
+                toggle
+                    .setValue(this.plugin.settings.sync.syncCalendar)
+                    .onChange(async (value) => {
+                        this.plugin.settings.sync.syncCalendar = value;
+                        await this.plugin.savePluginSettings();
+                    })
+            );
+
         containerEl.createEl("h3", { text: "OAuth quick actions" });
 
         new Setting(containerEl)

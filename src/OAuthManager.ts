@@ -17,7 +17,8 @@ export class OAuthManager {
         "openid",
         "email",
         "profile",
-        "https://www.googleapis.com/auth/calendar"
+        "https://www.googleapis.com/auth/calendar",
+        "https://www.googleapis.com/auth/tasks"
     ];
 
     private plugin: ObsidianCalendarAgentPlugin;
