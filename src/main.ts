@@ -18,6 +18,10 @@ import { VaultContext } from "./VaultContext";
 import { SafetyLayer } from "./SafetyLayer";
 import { SettingsTab } from "./SettingsTab";
 import { SyncManager } from "./SyncManager";
+import { AnalysisHistory } from "./AnalysisHistory";
+import { WorkCategoryConfig } from "./WorkCategoryConfig";
+import { DocumentAnalyzer } from "./DocumentAnalyzer";
+import { InsightsDashboard, VIEW_TYPE_INSIGHTS_DASHBOARD } from "./InsightsDashboard";
 
 export const VIEW_TYPE_CALENDAR_AGENT = "obsidian-calendar-agent-view";
 
@@ -31,6 +35,9 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
     vaultContext!: VaultContext;
     safetyLayer!: SafetyLayer;
     syncManager!: SyncManager;
+    analysisHistory!: AnalysisHistory;
+    workCategoryConfig!: WorkCategoryConfig;
+    documentAnalyzer!: DocumentAnalyzer;
 
     async onload(): Promise<void> {
         try {
@@ -50,16 +57,34 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
                 googleTasksApi: this.googleTasksApi,
                 oauthManager: this.oauthManager,
                 vaultContext: this.vaultContext,
-                safetyLayer: this.safetyLayer
+                safetyLayer: this.safetyLayer,
+                documentAnalyzer: this.documentAnalyzer
             });
             this.geminiAgent = new GeminiAgent(this, this.calendarTools);
             this.syncManager = new SyncManager(this, this.googleTasksApi, this.googleCalendarApi);
             this.syncManager.startAutoSync();
 
+            this.analysisHistory = new AnalysisHistory(this);
+            await this.analysisHistory.initialize();
+
+            this.workCategoryConfig = new WorkCategoryConfig();
+
+            this.documentAnalyzer = new DocumentAnalyzer({
+                plugin: this,
+                geminiAgent: this.geminiAgent,
+                analysisHistory: this.analysisHistory,
+                vaultContext: this.vaultContext,
+                workCategoryConfig: this.workCategoryConfig
+            });
+
             this.addSettingTab(new SettingsTab(this.app, this));
 
             this.registerView(VIEW_TYPE_CALENDAR_AGENT, (leaf) => {
                 return new CalendarView(leaf, this);
+            });
+
+            this.registerView(VIEW_TYPE_INSIGHTS_DASHBOARD, (leaf) => {
+                return new InsightsDashboard(leaf, this);
             });
 
             this.addCommand({
@@ -232,6 +257,39 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
                 }
             });
 
+            this.addCommand({
+                id: "analyze-document-image",
+                name: "📋 Phân tích tài liệu công việc (AI)",
+                callback: () => {
+                    new Notice("Paste ảnh vào Calendar Agent chat để phân tích tài liệu.");
+                }
+            });
+
+            this.addCommand({
+                id: "show-work-insights",
+                name: "📊 Xem thống kê phân tích công việc",
+                callback: async () => {
+                    await this.activateInsightsDashboard();
+                }
+            });
+
+            this.addCommand({
+                id: "recalculate-patterns",
+                name: "🔄 Tính lại Work Patterns",
+                callback: async () => {
+                    new Notice("Đang tính lại patterns...");
+                    try {
+                        const categories = this.workCategoryConfig.getAllCategories();
+                        for (const cat of categories) {
+                            await this.analysisHistory.getPatternsForCategory(cat);
+                        }
+                        new Notice("✅ Đã tính lại patterns cho tất cả categories.");
+                    } catch (error) {
+                        new Notice(`Lỗi tính patterns: ${(error as Error).message}`);
+                    }
+                }
+            });
+
             // Tự mở sidebar nếu user bật setting này
             if (this.settings.autoOpenSidebarOnStart) {
                 await this.activateView();
@@ -369,6 +427,24 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
         } catch (error) {
             console.error("[obsidian-calendar-agent] activateView failed", error);
             new Notice("Calendar Agent: Không mở được sidebar.");
+        }
+    }
+
+    async activateInsightsDashboard(): Promise<void> {
+        try {
+            const { workspace } = this.app;
+            let leaf = workspace.getLeavesOfType(VIEW_TYPE_INSIGHTS_DASHBOARD)[0] ?? null;
+            if (!leaf) {
+                leaf = workspace.getRightLeaf(false);
+                if (!leaf) {
+                    throw new Error("Không thể tạo sidebar leaf.");
+                }
+                await leaf.setViewState({ type: VIEW_TYPE_INSIGHTS_DASHBOARD, active: true });
+            }
+            workspace.revealLeaf(leaf);
+        } catch (error) {
+            console.error("[obsidian-calendar-agent] activateInsightsDashboard failed", error);
+            new Notice("Không mở được Insights Dashboard.");
         }
     }
 

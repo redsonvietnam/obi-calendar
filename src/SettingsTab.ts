@@ -231,6 +231,36 @@ export class SettingsTab extends PluginSettingTab {
                     })
             );
 
+        containerEl.createEl("h3", { text: "📊 Document Analysis & Learning" });
+
+        new Setting(containerEl)
+            .setName("Bật Pattern Learning")
+            .setDesc("AI học từ lịch sử phân tích để ước lượng tốt hơn")
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.documentAnalysis?.enablePatternLearning ?? true)
+                .onChange(async value => {
+                    if (!this.plugin.settings.documentAnalysis) {
+                        this.plugin.settings.documentAnalysis = { enablePatternLearning: true, showPatternInsights: true };
+                    }
+                    this.plugin.settings.documentAnalysis.enablePatternLearning = value;
+                    await this.plugin.savePluginSettings();
+                })
+            );
+
+        new Setting(containerEl)
+            .setName("Hiển thị Pattern Insights trong Review")
+            .setDesc("Hiển thị thống kê lịch sử khi xem xét phân tích mới")
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.documentAnalysis?.showPatternInsights ?? true)
+                .onChange(async value => {
+                    if (!this.plugin.settings.documentAnalysis) {
+                        this.plugin.settings.documentAnalysis = { enablePatternLearning: true, showPatternInsights: true };
+                    }
+                    this.plugin.settings.documentAnalysis.showPatternInsights = value;
+                    await this.plugin.savePluginSettings();
+                })
+            );
+
         containerEl.createEl("h3", { text: "OAuth quick actions" });
 
         new Setting(containerEl)

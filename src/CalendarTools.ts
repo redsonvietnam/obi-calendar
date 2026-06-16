@@ -24,6 +24,8 @@ export interface ToolExecutionResult {
     error?: string;
 }
 
+import { DocumentAnalyzer } from "./DocumentAnalyzer";
+
 export interface CalendarToolsDependencies {
     plugin: ObsidianCalendarAgentPlugin;
     calendarApi: GoogleCalendarAPI;
@@ -31,6 +33,7 @@ export interface CalendarToolsDependencies {
     vaultContext: VaultContext;
     safetyLayer: SafetyLayer;
     oauthManager: OAuthManager; // Add OAuthManager for GoogleTasksAPI initialization
+    documentAnalyzer?: DocumentAnalyzer;
 }
 
 type ToolExecutor = (args: Record<string, unknown>) => Promise<unknown>;
@@ -45,6 +48,7 @@ export class CalendarTools {
     private readonly vaultContext: VaultContext;
     private readonly safetyLayer: SafetyLayer;
     private readonly googleTasksApi: GoogleTasksAPI; // Add GoogleTasksAPI instance
+    private readonly documentAnalyzer?: DocumentAnalyzer;
     private readonly executors: Record<string, ToolExecutor>;
 
     constructor(deps: CalendarToolsDependencies) {
@@ -54,6 +58,7 @@ export class CalendarTools {
         this.googleTasksApi = new GoogleTasksAPI(deps.plugin, deps.oauthManager);
         this.vaultContext = deps.vaultContext;
         this.safetyLayer = deps.safetyLayer;
+        this.documentAnalyzer = deps.documentAnalyzer;
 
         this.executors = {
             list_events: this.execListEvents.bind(this),
@@ -71,7 +76,11 @@ export class CalendarTools {
             create_task: this.execCreateTask.bind(this),
             update_task: this.execUpdateTask.bind(this),
             patch_task: this.execPatchTask.bind(this),
-            delete_task: this.execDeleteTask.bind(this)
+            delete_task: this.execDeleteTask.bind(this),
+            // Document Analysis tools
+            analyze_document_image: this.execAnalyzeDocumentImage.bind(this),
+            create_task_from_analysis: this.execCreateTaskFromAnalysis.bind(this),
+            create_event_from_analysis: this.execCreateEventFromAnalysis.bind(this)
         };
     }
 
@@ -81,7 +90,8 @@ export class CalendarTools {
     getGeminiToolDeclarations(excludeTools?: string[]): ToolDefinition[] {
         let decls = [
             ...this.getCalendarToolDeclarations(),
-            ...this.getGoogleTasksToolDeclarations()
+            ...this.getGoogleTasksToolDeclarations(),
+            ...this.getDocumentAnalysisToolDeclarations()
         ];
         if (excludeTools && excludeTools.length > 0) {
             decls = decls.filter(d => !excludeTools.includes(d.name));
@@ -647,6 +657,82 @@ export class CalendarTools {
         const taskId = this.asRequiredString(args.taskId, "taskId");
         await this.googleTasksApi.deleteTask(tasklistId, taskId);
         return { deleted: true, tasklistId, taskId };
+    }
+
+    private getDocumentAnalysisToolDeclarations(): ToolDefinition[] {
+        return [
+            {
+                name: "analyze_document_image",
+                description: "Phân tích tài liệu công việc từ ảnh scan — OCR + phân loại category + ước lượng",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        imageBase64: { type: "string", description: "Base64 encoded image (no data: prefix)" },
+                        userContext: { type: "string", description: "Ngữ cảnh bổ sung từ user" }
+                    },
+                    required: ["imageBase64"]
+                }
+            },
+            {
+                name: "create_task_from_analysis",
+                description: "Tạo Google Task từ kết quả phân tích DocumentAnalyzer",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        jobTitle: { type: "string" },
+                        deadline: { type: "string", description: "ISO date YYYY-MM-DD" },
+                        notes: { type: "string", description: "Chi tiết và action plan" }
+                    },
+                    required: ["jobTitle"]
+                }
+            },
+            {
+                name: "create_event_from_analysis",
+                description: "Tạo Google Calendar event từ phân tích DocumentAnalyzer",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        jobTitle: { type: "string" },
+                        startDate: { type: "string", description: "RFC3339" },
+                        endDate: { type: "string", description: "RFC3339" },
+                        description: { type: "string" },
+                        timeZone: { type: "string" }
+                    },
+                    required: ["jobTitle", "startDate", "endDate"]
+                }
+            }
+        ];
+    }
+
+    private async execAnalyzeDocumentImage(args: Record<string, unknown>): Promise<unknown> {
+        const imageBase64 = this.asRequiredString(args.imageBase64, "imageBase64");
+        const userContext = this.asOptionalString(args.userContext);
+        if (!this.documentAnalyzer) {
+            throw new Error("DocumentAnalyzer chưa được khởi tạo trong plugin.");
+        }
+        return await this.documentAnalyzer.analyzeDocument(imageBase64, userContext);
+    }
+
+    private async execCreateTaskFromAnalysis(args: Record<string, unknown>): Promise<unknown> {
+        const title = this.asRequiredString(args.jobTitle, "jobTitle");
+        const due = this.asOptionalString(args.deadline);
+        const notes = this.asOptionalString(args.notes);
+        const task: Partial<GoogleTask> = { title, due, notes };
+        return await this.googleTasksApi.createTask("@default", task);
+    }
+
+    private async execCreateEventFromAnalysis(args: Record<string, unknown>): Promise<unknown> {
+        const summary = this.asRequiredString(args.jobTitle, "jobTitle");
+        const startDateTime = this.asRequiredString(args.startDate, "startDate");
+        const endDateTime = this.asRequiredString(args.endDate, "endDate");
+        const timeZone = this.asOptionalString(args.timeZone) ?? this.getTimezone();
+        const event: GoogleCalendarEvent = {
+            summary,
+            description: this.asOptionalString(args.description),
+            start: { dateTime: startDateTime, timeZone },
+            end: { dateTime: endDateTime, timeZone }
+        };
+        return await this.calendarApi.createEvent("primary", event);
     }
 
     private async execGetVaultContext(): Promise<unknown> {

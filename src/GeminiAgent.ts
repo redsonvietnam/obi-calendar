@@ -112,7 +112,8 @@ Hãy ngắn gọn, hữu ích và tập trung vào việc giảm bớt gánh n�
         timezone: string,
         vaultSnapshot: string,
         signal?: AbortSignal,
-        excludedTools?: string[]
+        excludedTools?: string[],
+        imageBase64?: string
     ): Promise<AgentRunResult & { updatedHistory: GeminiContent[] }> {
         const apiKey = this.plugin.settings.geminiApiKey?.trim();
         if (!apiKey) {
@@ -124,13 +125,20 @@ Hãy ngắn gọn, hữu ích và tập trung vào việc giảm bớt gánh n�
             parts: [{ text: this.buildSystemPrompt(timezone, vaultSnapshot) }]
         };
 
+        const userParts: GeminiPart[] = [{ text: userMessage }];
+        if (imageBase64) {
+            userParts.push({
+                inlineData: {
+                    mimeType: "image/jpeg",
+                    data: imageBase64.replace(/^data:image\/\w+;base64,/, "")
+                }
+            });
+        }
+
         const contents: GeminiContent[] = [
-            systemTurn, // Prepend system prompt
+            systemTurn,
             ...history,
-            {
-                role: "user",
-                parts: [{ text: userMessage }]
-            }
+            { role: "user", parts: userParts }
         ];
 
         const toolTrace: AgentRunResult["toolTrace"] = [];

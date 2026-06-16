@@ -1,7 +1,8 @@
-import { Modal, Notice } from "obsidian";
+import { Modal, Notice, Setting } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
+import { DocumentAnalysisResult, PatternInsights } from "./types";
 
-export type SafetyActionType = "create_event" | "update_event" | "delete_event" | "write_note";
+export type SafetyActionType = "create_event" | "update_event" | "delete_event" | "write_note" | "analyze_document";
 
 export interface SafetyConfirmRequest {
     action: SafetyActionType;
@@ -78,6 +79,21 @@ export class SafetyLayer {
         }
     }
 
+    async confirmAnalysis(
+        analysis: DocumentAnalysisResult,
+        patterns: PatternInsights
+    ): Promise<{ confirmed: boolean }> {
+        return new Promise((resolve) => {
+            const modal = new DocumentAnalysisConfirmModal(
+                this.plugin,
+                analysis,
+                patterns,
+                (confirmed) => resolve({ confirmed })
+            );
+            modal.open();
+        });
+    }
+
     private openConfirmModal(request: SafetyConfirmRequest): Promise<boolean> {
         return new Promise((resolve) => {
             const modal = new SafetyConfirmModal(this.plugin, request, resolve);
@@ -144,5 +160,75 @@ class SafetyConfirmModal extends Modal {
         if (this.resolved) return;
         this.resolved = true;
         this.onDone(accepted);
+    }
+}
+
+class DocumentAnalysisConfirmModal extends Modal {
+    private readonly analysis: DocumentAnalysisResult;
+    private readonly patterns: PatternInsights;
+    private readonly onDone: (confirmed: boolean) => void;
+    private resolved = false;
+
+    constructor(
+        plugin: ObsidianCalendarAgentPlugin,
+        analysis: DocumentAnalysisResult,
+        patterns: PatternInsights,
+        onDone: (confirmed: boolean) => void
+    ) {
+        super(plugin.app);
+        this.analysis = analysis;
+        this.patterns = patterns;
+        this.onDone = onDone;
+    }
+
+    onOpen(): void {
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.addClass("oca-analysis-modal");
+
+        contentEl.createEl("h2", { text: this.analysis.jobTitle });
+
+        const meta = contentEl.createDiv({ cls: "oca-analysis-meta" });
+        meta.createEl("span", { text: `📁 ${this.analysis.category}`, cls: "oca-category-badge" });
+        meta.createEl("span", { text: `⏰ ${this.analysis.deadline}` });
+        meta.createEl("span", { text: `🕐 ${this.analysis.estimatedHours}h` });
+
+        if (this.patterns.totalAnalyzed > 0) {
+            const insight = contentEl.createDiv({ cls: "oca-pattern-insight" });
+            insight.createEl("strong", {
+                text: `✓ ${this.patterns.totalAnalyzed} công việc tương tự: avg ${this.patterns.avgDeadlineDays} ngày, ${this.patterns.estimateAccuracy}% accuracy`
+            });
+        }
+
+        if (this.analysis.actionPlan.length > 0) {
+            const planSection = contentEl.createDiv({ cls: "oca-action-plan" });
+            planSection.createEl("h4", { text: "Action Plan:" });
+            for (const step of this.analysis.actionPlan) {
+                const item = planSection.createEl("label", { cls: "oca-action-step" });
+                item.createEl("input", { type: "checkbox" });
+                item.appendText(` ${step.title} (${step.estimatedHours}h)`);
+            }
+        }
+
+        const buttonRow = contentEl.createDiv({ cls: "oca-confirm-actions" });
+        const cancelBtn = buttonRow.createEl("button", { text: "❌ Cancel" });
+        cancelBtn.addEventListener("click", () => { this.finish(false); this.close(); });
+
+        const editBtn = buttonRow.createEl("button", { text: "✏️ Edit" });
+        editBtn.addEventListener("click", () => { this.finish(false); this.close(); });
+
+        const addBtn = buttonRow.createEl("button", { text: "✅ Add to Calendar", cls: "mod-cta" });
+        addBtn.addEventListener("click", () => { this.finish(true); this.close(); });
+    }
+
+    onClose(): void {
+        this.contentEl.empty();
+        this.finish(false);
+    }
+
+    private finish(confirmed: boolean): void {
+        if (this.resolved) return;
+        this.resolved = true;
+        this.onDone(confirmed);
     }
 }
