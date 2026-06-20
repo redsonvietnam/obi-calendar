@@ -41,12 +41,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 6px;
+    gap: 8px;
     padding: 4px 8px;
     border-bottom: 1px solid var(--divider-color);
     background-color: var(--background-secondary);
     flex-shrink: 0;
-    min-height: 36px;
+    min-height: 32px;
     box-sizing: border-box;
 }
 
@@ -61,8 +61,8 @@
     text-overflow: ellipsis;
 }
 
-.oca-chat-header .oca-header-btn {
-    padding: 2px 6px;
+.oca-chat-header.oca-header-btn {
+    padding: 1px 6px;
     border: 1px solid var(--divider-color);
     border-radius: 4px;
     background: transparent;
@@ -74,7 +74,7 @@
     white-space: nowrap;
 }
 
-.oca-chat-header .oca-header-btn:hover {
+.oca-chat-header.oca-header-btn:hover {
     background: var(--background-modifier-hover);
     color: var(--text-normal);
 }
@@ -427,11 +427,11 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 3px 8px;
+    padding: 2px 8px;
     border-bottom: 1px solid var(--divider-color);
     background-color: var(--background-secondary);
     flex-shrink: 0;
-    min-height: 38px;
+    min-height: 34px;
     box-sizing: border-box;
 }
 
@@ -454,7 +454,7 @@
 }
 
 .oca-nav-btn {
-    padding: 2px 6px;
+    padding: 1px 5px;
     border: 1px solid var(--divider-color);
     border-radius: 4px;
     background-color: var(--background-primary);
@@ -496,7 +496,7 @@
 
 .oca-view-mode-btn {
     flex: 1;
-    padding: 3px 4px;
+    padding: 2px 4px;
     border: 1px solid var(--divider-color);
     background-color: var(--background-primary);
     color: var(--text-muted);
