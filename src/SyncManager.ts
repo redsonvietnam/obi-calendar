@@ -188,10 +188,23 @@ export class SyncManager {
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
         const dailyNotePath = `${this.plugin.settings.dailyNotesFolder}/${today}.md`;
 
-        const file = this.plugin.app.vault.getAbstractFileByPath(dailyNotePath);
-        if (!(file instanceof TFile)) {
-            console.log(`[SyncManager] No daily note found for today: ${dailyNotePath}`);
-            return 0;
+        let file: TFile | null = this.plugin.app.vault.getAbstractFileByPath(dailyNotePath) as TFile;
+        if (!file || !(file instanceof TFile)) {
+            console.log(`[SyncManager] Daily note not found for today: ${dailyNotePath}. Attempting to create it.`);
+            try {
+                // Ensure the parent directory exists before creating the file
+                const folderPath = this.plugin.settings.dailyNotesFolder;
+                if (folderPath) {
+                    // createFolder is idempotent, won't throw if folder exists
+                    await this.plugin.app.vault.createFolder(folderPath);
+                }
+                file = await this.plugin.app.vault.create(dailyNotePath, "");
+                new Notice(`Đã tạo ghi chú hàng ngày cho hôm nay: ${dailyNotePath}`);
+            } catch (error) {
+                console.error(`[SyncManager] Failed to create daily note ${dailyNotePath}:`, error);
+                new Notice(`Không thể tạo ghi chú hàng ngày: ${dailyNotePath}. Vui lòng kiểm tra quyền hoặc đường dẫn thư mục.`);
+                return 0;
+            }
         }
 
         const events = await this.googleCalendarApi.listEvents({

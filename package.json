@@ -1,5 +1,5 @@
 {
-    "name": "obsidian-calendar-agent",
+    "name": "calendar-agent",
     "version": "0.0.1",
     "description": "Obsidian plugin: AI calendar assistant with Gemini + Google Calendar",
     "main": "main.js",
@@ -19,6 +19,7 @@
     "license": "MIT",
     "devDependencies": {
         "@types/node": "^20.14.11",
+        "codegraph": "^1.0.0",
         "esbuild": "^0.23.0",
         "obsidian": "^1.6.7",
         "typescript": "^5.5.4"

@@ -1,0 +1,4 @@
+
+> calendar-agent@0.0.1 build
+> node esbuild.config.mjs production
+

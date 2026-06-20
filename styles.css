@@ -40,80 +40,52 @@
 .oca-chat-header {
     display: flex;
     align-items: center;
-    gap: var(--oca-spacing-sm);
-    padding: 6px var(--oca-spacing-md);
+    justify-content: space-between;
+    gap: 6px;
+    padding: 4px 8px;
     border-bottom: 1px solid var(--divider-color);
     background-color: var(--background-secondary);
     flex-shrink: 0;
+    min-height: 36px;
+    box-sizing: border-box;
 }
 
 .oca-chat-header h3 {
     margin: 0;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-normal);
+    white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.oca-chat-header p {
-    margin: 0;
-    font-size: 11px;
-    color: var(--text-muted);
-    flex: 1;
-}
-
-.oca-chat-header .oca-header-actions {
-    display: flex;
-    gap: 4px;
-    flex-shrink: 0;
-}
-
-.oca-header-btn {
-    padding: 2px 8px;
+.oca-chat-header .oca-header-btn {
+    padding: 2px 6px;
     border: 1px solid var(--divider-color);
     border-radius: 4px;
     background: transparent;
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: 10px;
     cursor: pointer;
     transition: all 0.15s ease;
-    line-height: 1.6;
+    line-height: 1.2;
+    white-space: nowrap;
 }
 
-.oca-header-btn:hover {
+.oca-chat-header .oca-header-btn:hover {
     background: var(--background-modifier-hover);
     color: var(--text-normal);
 }
 
-/* Tab navigation */
+/* Remove top tab navigation (moved to bottom) */
 .oca-tabs {
-    display: flex;
-    padding: 0 var(--oca-spacing-sm);
-    border-bottom: 1px solid var(--divider-color);
-    background-color: var(--background-secondary);
-    flex-shrink: 0;
+    display: none;
 }
 
 .oca-tab {
-    padding: 6px 12px;
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all 0.15s ease;
-    margin-bottom: -1px;
-}
-
-.oca-tab:hover {
-    color: var(--text-normal);
-    background: var(--background-modifier-hover);
-}
-
-.oca-tab.active {
-    color: var(--interactive-accent);
-    border-bottom-color: var(--interactive-accent);
+    /* Keep for backward compatibility */
 }
 
 /* Tab content containers */
@@ -122,6 +94,7 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
+    min-height: 0;
 }
 
 .oca-tab-content.active {
@@ -130,14 +103,14 @@
 }
 
 /* ============================================
-   QUICK ACTION PILLS
+   QUICK ACTION PILLS (inside drawer)
    ============================================ */
 
 .oca-quick-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-    padding: 6px var(--oca-spacing-sm);
+    padding: 8px 6px;
     border-bottom: 1px solid var(--divider-color);
     flex-shrink: 0;
 }
@@ -453,15 +426,17 @@
 .oca-calendar-header {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
+    gap: 4px;
+    padding: 3px 8px;
     border-bottom: 1px solid var(--divider-color);
     background-color: var(--background-secondary);
     flex-shrink: 0;
+    min-height: 38px;
+    box-sizing: border-box;
 }
 
 .oca-calendar-title {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-normal);
     margin: 0;
@@ -479,15 +454,16 @@
 }
 
 .oca-nav-btn {
-    padding: 3px 7px;
+    padding: 2px 6px;
     border: 1px solid var(--divider-color);
     border-radius: 4px;
     background-color: var(--background-primary);
     color: var(--text-normal);
-    font-size: 11px;
+    font-size: 10px;
     cursor: pointer;
     transition: all 0.12s ease;
-    line-height: 1.4;
+    line-height: 1.2;
+    white-space: nowrap;
 }
 
 .oca-nav-btn:hover {
@@ -512,7 +488,7 @@
 .oca-view-modes {
     display: flex;
     gap: 2px;
-    padding: 3px 10px;
+    padding: 2px 8px;
     border-bottom: 1px solid var(--divider-color);
     background-color: var(--background-secondary);
     flex-shrink: 0;
@@ -520,16 +496,17 @@
 
 .oca-view-mode-btn {
     flex: 1;
-    padding: 4px 4px;
+    padding: 3px 4px;
     border: 1px solid var(--divider-color);
     background-color: var(--background-primary);
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.12s ease;
     text-align: center;
     border-radius: 0;
+    line-height: 1.2;
 }
 
 .oca-view-mode-btn:first-child {
@@ -1733,4 +1710,77 @@
 .oca-proposal-cancel:hover {
     background: var(--background-modifier-hover);
     color: var(--text-normal);
+}
+
+/* ============================================
+   BOTTOM NAVIGATION (3 switch buttons)
+   ============================================ */
+
+.oca-bottom-nav {
+    display: flex;
+    background-color: var(--background-secondary);
+    border-top: 1px solid var(--divider-color);
+    flex-shrink: 0;
+    height: 40px;
+    padding: 2px 4px;
+    gap: 3px;
+    align-items: center;
+    justify-content: space-around;
+}
+
+.oca-nav-btn {
+    flex: 1;
+    height: 28px;
+    border: 1px solid var(--divider-color);
+    border-radius: 7px;
+    background-color: var(--background-primary);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    white-space: nowrap;
+    padding: 0 4px;
+}
+
+.oca-nav-btn:hover {
+    background-color: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.oca-nav-btn.active {
+    background-color: var(--interactive-accent);
+    color: white;
+    border-color: var(--interactive-accent);
+    font-weight: 600;
+}
+
+/* ============================================
+   SUGGESTION DRAWER (collapsible panel)
+   ============================================ */
+
+.oca-suggestion-drawer {
+    border-top: 1px solid var(--divider-color);
+    background-color: var(--background-secondary);
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    flex-shrink: 0;
+    max-height: 88px;
+}
+
+.oca-suggestion-drawer.collapsed {
+    max-height: 0;
+    border-top-width: 0;
+}
+
+.oca-suggestion-drawer.expanded {
+    max-height: 96px;
+}
+
+.oca-suggestion-drawer-content {
+    padding: 4px 8px;
 }

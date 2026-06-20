@@ -63,7 +63,7 @@ export class GoogleTasksAPI {
         if (params.maxResults) query.set("maxResults", String(params.maxResults));
 
         const queryString = query.toString();
-        const path = queryString ? `/tasklists?${queryString}` : `/tasklists`;
+        const path = queryString ? `/users/@me/lists?${queryString}` : `/users/@me/lists`;
         const response = await this.request<ListTaskListsResponse>("GET", path);
 
         return response.items ?? [];
@@ -74,7 +74,7 @@ export class GoogleTasksAPI {
      */
     async getTaskList(tasklistId: string): Promise<GoogleTaskList> {
         this.assertRequired(tasklistId, "tasklistId");
-        const path = `/tasklists/${encodeURIComponent(tasklistId)}`;
+        const path = `/users/@me/lists/${encodeURIComponent(tasklistId)}`;
         return this.request<GoogleTaskList>("GET", path);
     }
 
@@ -84,7 +84,7 @@ export class GoogleTasksAPI {
     async createTaskList(title: string): Promise<GoogleTaskList> {
         this.assertRequired(title, "title");
         const body = { title };
-        const path = `/tasklists`;
+        const path = `/users/@me/lists`;
         return this.request<GoogleTaskList>("POST", path, body);
     }
 
@@ -93,7 +93,7 @@ export class GoogleTasksAPI {
      */
     async deleteTaskList(tasklistId: string): Promise<void> {
         this.assertRequired(tasklistId, "tasklistId");
-        const path = `/tasklists/${encodeURIComponent(tasklistId)}`;
+        const path = `/users/@me/lists/${encodeURIComponent(tasklistId)}`;
         await this.request<void>("DELETE", path);
     }
 
@@ -114,8 +114,8 @@ export class GoogleTasksAPI {
 
         const queryString = query.toString();
         const path = queryString
-            ? `/tasklists/${encodeURIComponent(tasklistId)}/tasks?${queryString}`
-            : `/tasklists/${encodeURIComponent(tasklistId)}/tasks`;
+            ? `/lists/${encodeURIComponent(tasklistId)}/tasks?${queryString}`
+            : `/lists/${encodeURIComponent(tasklistId)}/tasks`;
         const response = await this.request<ListTasksResponse>("GET", path);
 
         return response.items ?? [];
@@ -127,7 +127,7 @@ export class GoogleTasksAPI {
     async getTask(tasklistId: string, taskId: string): Promise<GoogleTask> {
         this.assertRequired(tasklistId, "tasklistId");
         this.assertRequired(taskId, "taskId");
-        const path = `/tasklists/${encodeURIComponent(tasklistId)}/tasks/${encodeURIComponent(taskId)}`;
+        const path = `/lists/${encodeURIComponent(tasklistId)}/tasks/${encodeURIComponent(taskId)}`;
         return this.request<GoogleTask>("GET", path);
     }
 
@@ -137,7 +137,7 @@ export class GoogleTasksAPI {
     async createTask(tasklistId: string, task: Partial<GoogleTask>): Promise<GoogleTask> {
         this.assertRequired(tasklistId, "tasklistId");
         this.validateTaskPayload(task);
-        const path = `/tasklists/${encodeURIComponent(tasklistId)}/tasks`;
+        const path = `/lists/${encodeURIComponent(tasklistId)}/tasks`;
         return this.request<GoogleTask>("POST", path, task);
     }
 
@@ -148,7 +148,7 @@ export class GoogleTasksAPI {
         this.assertRequired(tasklistId, "tasklistId");
         this.assertRequired(taskId, "taskId");
         this.validateTaskPayload(task);
-        const path = `/tasklists/${encodeURIComponent(tasklistId)}/tasks/${encodeURIComponent(taskId)}`;
+        const path = `/lists/${encodeURIComponent(tasklistId)}/tasks/${encodeURIComponent(taskId)}`;
         return this.request<GoogleTask>("PUT", path, task);
     }
 
@@ -158,7 +158,7 @@ export class GoogleTasksAPI {
     async patchTask(tasklistId: string, taskId: string, partial: Partial<GoogleTask>): Promise<GoogleTask> {
         this.assertRequired(tasklistId, "tasklistId");
         this.assertRequired(taskId, "taskId");
-        const path = `/tasklists/${encodeURIComponent(tasklistId)}/tasks/${encodeURIComponent(taskId)}`;
+        const path = `/lists/${encodeURIComponent(tasklistId)}/tasks/${encodeURIComponent(taskId)}`;
         return this.request<GoogleTask>("PATCH", path, partial);
     }
 
@@ -168,7 +168,7 @@ export class GoogleTasksAPI {
     async deleteTask(tasklistId: string, taskId: string): Promise<void> {
         this.assertRequired(tasklistId, "tasklistId");
         this.assertRequired(taskId, "taskId");
-        const path = `/tasklists/${encodeURIComponent(tasklistId)}/tasks/${encodeURIComponent(taskId)}`;
+        const path = `/lists/${encodeURIComponent(tasklistId)}/tasks/${encodeURIComponent(taskId)}`;
         await this.request<void>("DELETE", path);
     }
 
@@ -183,10 +183,12 @@ export class GoogleTasksAPI {
         }
 
         const url = `${GoogleTasksAPI.BASE_URL}${path}`;
+        console.log(`[GoogleTasksAPI] Calling URL: ${url}`);
 
         const headers: Record<string, string> = {
             Authorization: `Bearer ${accessToken}`
         };
+        console.log(`[GoogleTasksAPI] Headers:`, headers);
 
         let requestBody: string | undefined;
         if (body !== undefined) {

@@ -4,6 +4,7 @@ import {
     WorkspaceLeaf,
     MarkdownRenderer
 } from "obsidian";
+import { PromptModal } from "./PromptModal";
 import type ObsidianCalendarAgentPlugin from "./main";
 import {
     ChatMessage,
@@ -63,6 +64,9 @@ export class CalendarView extends ItemView {
     private sendBtnEl!: HTMLButtonElement;
     private stopBtnEl!: HTMLButtonElement; // Reference to the stop button
     private statusEl!: HTMLDivElement;
+    private fileInputEl!: HTMLInputElement; // Hidden file input
+    private attachedFilesEl!: HTMLDivElement; // Container for attached files display
+    private attachedFiles: string[] = []; // Array of file paths
 
     private calendarTitleEl!: HTMLHeadingElement;
     private calendarBodyEl!: HTMLDivElement;
@@ -138,32 +142,7 @@ export class CalendarView extends ItemView {
 
         this.rootEl = contentEl.createDiv({ cls: "oca-chat-root" });
 
-        const headerEl = this.rootEl.createDiv({ cls: "oca-chat-header" });
-        headerEl.createEl("h3", { text: "Calendar Agent" });
-        headerEl.createEl("p", { text: "Gemini · Google Calendar" });
-
-        const actions = headerEl.createDiv({ cls: "oca-header-actions" });
-        const syncBtn = actions.createEl("button", { cls: "oca-header-btn", text: "🔄" });
-        syncBtn.title = "Đồng bộ Google";
-        syncBtn.addEventListener("click", async () => {
-            new Notice("Đang đồng bộ...");
-            try {
-                const results = await this.plugin.syncManager.syncAll();
-                new Notice(`Done! Tasks: ${results.tasksUpdated}, Calendar: ${results.calendarUpdated}`);
-            } catch (error) {
-                new Notice(`Lỗi: ${(error as Error).message}`);
-            }
-        });
-
-        const tabsEl = this.rootEl.createDiv({ cls: "oca-tabs" });
-        this.tabChatEl = tabsEl.createEl("button", { cls: "oca-tab", text: "Chat" });
-        this.tabCalendarEl = tabsEl.createEl("button", { cls: "oca-tab", text: "Calendar" });
-        this.tabTasksEl = tabsEl.createEl("button", { cls: "oca-tab", text: "Tasks" });
-
-        this.tabChatEl.addEventListener("click", () => this.switchTab("chat"));
-        this.tabCalendarEl.addEventListener("click", () => this.switchTab("calendar"));
-        this.tabTasksEl.addEventListener("click", () => this.switchTab("tasks"));
-
+        // Chat panel (default visible)
         this.chatPanelEl = this.rootEl.createDiv({ cls: "oca-tab-content" });
         this.calendarPanelEl = this.rootEl.createDiv({ cls: "oca-tab-content" });
         this.tasksPanelEl = this.rootEl.createDiv({ cls: "oca-tab-content" });
@@ -171,24 +150,54 @@ export class CalendarView extends ItemView {
         this.renderChatPanel();
         this.renderCalendarPanel();
         this.renderTasksPanel();
+
+        // Bottom navigation
+        const bottomNav = this.rootEl.createDiv({ cls: "oca-bottom-nav" });
+        this.tabChatEl = bottomNav.createEl("button", { cls: "oca-nav-btn", text: "💬 Chat" });
+        this.tabCalendarEl = bottomNav.createEl("button", { cls: "oca-nav-btn", text: "📅 Calendar" });
+        this.tabTasksEl = bottomNav.createEl("button", { cls: "oca-nav-btn", text: "✓ Tasks" });
+
+        this.tabChatEl.addEventListener("click", () => this.switchTab("chat"));
+        this.tabCalendarEl.addEventListener("click", () => this.switchTab("calendar"));
+        this.tabTasksEl.addEventListener("click", () => this.switchTab("tasks"));
     }
 
     private renderChatPanel(): void {
-        // Quick action pills
-        const quickEl = this.chatPanelEl.createDiv({ cls: "oca-quick-actions" });
+        this.messagesEl = this.chatPanelEl.createDiv({ cls: "oca-chat-messages" });
 
-        const processNoteBtn = quickEl.createEl("button", {
+        // Chat header with suggestion toggle
+        const chatHeader = this.chatPanelEl.createDiv({ cls: "oca-chat-header" });
+        chatHeader.createEl("h3", { text: "Calendar Agent" });
+
+        const suggestionToggle = chatHeader.createEl("button", {
+            cls: "oca-header-btn",
+            text: "💡 Suggestions"
+        });
+        suggestionToggle.title = "Mở/đóng suggestion drawer";
+        suggestionToggle.addEventListener("click", () => {
+            this.toggleSuggestionDrawer();
+        });
+
+        this.statusEl = this.chatPanelEl.createDiv({ cls: "oca-chat-status" });
+        this.statusEl.setText("Sẵn sàng · Gemini · Google Calendar");
+
+        // Suggestion drawer (hidden by default)
+        const drawerEl = this.chatPanelEl.createDiv({ cls: "oca-suggestion-drawer collapsed" });
+        const drawerContent = drawerEl.createDiv({ cls: "oca-suggestion-drawer-content" });
+        const quickBarEl = drawerContent.createDiv({ cls: "oca-quick-actions" });
+
+        const processNoteBtn = quickBarEl.createEl("button", {
             cls: "oca-pill oca-pill-primary",
-            text: "📝 Xử lý Note"
+            text: "📝 Note"
         });
         processNoteBtn.title = "Xử lý Note hiện tại";
         processNoteBtn.addEventListener("click", () => {
             void this.plugin.processCurrentNote();
         });
 
-        const scanInboxBtn = quickEl.createEl("button", {
+        const scanInboxBtn = quickBarEl.createEl("button", {
             cls: "oca-pill",
-            text: "📥 Quét Inbox"
+            text: "📥 Inbox"
         });
         scanInboxBtn.title = "Quét và xử lý ghi chú trong Inbox";
         scanInboxBtn.addEventListener("click", () => {
@@ -202,7 +211,7 @@ export class CalendarView extends ItemView {
         ];
 
         for (const item of quickPrompts) {
-            const btn = quickEl.createEl("button", {
+            const btn = quickBarEl.createEl("button", {
                 cls: "oca-pill",
                 text: item.label
             });
@@ -211,14 +220,32 @@ export class CalendarView extends ItemView {
             });
         }
 
-        this.messagesEl = this.chatPanelEl.createDiv({ cls: "oca-chat-messages" });
-
-        this.statusEl = this.chatPanelEl.createDiv({ cls: "oca-chat-status" });
-        this.statusEl.setText("Sẵn sàng.");
-
         const composerEl = this.chatPanelEl.createDiv({ cls: "oca-chat-composer" });
 
+        // Attached files display
+        this.attachedFilesEl = composerEl.createDiv({ cls: "oca-attached-files" });
+
         const inputWrap = composerEl.createDiv({ cls: "oca-input-wrap" });
+        
+        // File input (hidden)
+        this.fileInputEl = inputWrap.createEl("input", {
+            type: "file",
+            cls: "oca-file-input"
+        });
+        this.fileInputEl.multiple = true;
+        this.fileInputEl.style.display = "none";
+        this.fileInputEl.addEventListener("change", () => this.handleFileSelection());
+
+        // Attach button
+        const attachBtn = inputWrap.createEl("button", {
+            text: "📎",
+            cls: "oca-chat-attach",
+            title: "Đính kèm ảnh hoặc tài liệu"
+        });
+        attachBtn.addEventListener("click", () => {
+            this.fileInputEl.click();
+        });
+
         this.inputEl = inputWrap.createEl("textarea", {
             cls: "oca-chat-input"
         });
@@ -257,15 +284,188 @@ export class CalendarView extends ItemView {
         this.stopBtnEl.style.display = "none";
     }
 
+    private async handleFileSelection(): Promise<void> {
+        const files = this.fileInputEl.files;
+        if (!files || files.length === 0) return;
+
+        try {
+            // Ensure attachments folder exists
+            const attachmentsPath = "attachments";
+            try {
+                await this.app.vault.getAbstractFileByPath(attachmentsPath);
+            } catch (e) {
+                // Folder doesn't exist, create it
+                await this.app.vault.createFolder(attachmentsPath);
+            }
+
+            // Process each file
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileName = file.name;
+                let filePath = `${attachmentsPath}/${fileName}`;
+
+                // Handle duplicate filenames
+                let counter = 1;
+                const nameParts = fileName.split(".");
+                const baseName = nameParts.slice(0, -1).join(".");
+                const extension = nameParts[nameParts.length - 1];
+
+                // Check if file exists and rename if needed
+                let fileExists = true;
+                while (fileExists) {
+                    try {
+                        await this.app.vault.getAbstractFileByPath(filePath);
+                        // File exists, try next name
+                        filePath = `${attachmentsPath}/${baseName}_${counter}.${extension}`;
+                        counter++;
+                    } catch (e) {
+                        // File doesn't exist, we can use this name
+                        fileExists = false;
+                    }
+                }
+
+                // Read file and save to vault
+                const arrayBuffer = await file.arrayBuffer();
+                await this.app.vault.createBinary(filePath, arrayBuffer);
+                
+                console.log("[CalendarView] File uploaded:", filePath);
+                
+                // Add to attached files list
+                if (!this.attachedFiles.includes(filePath)) {
+                    this.attachedFiles.push(filePath);
+                }
+            }
+
+            // Update UI
+            this.renderAttachedFiles();
+            new Notice(`Đã thêm ${files.length} file.`);
+
+            // Reset file input
+            this.fileInputEl.value = "";
+        } catch (error) {
+            console.error("[CalendarView] File upload error:", error);
+            new Notice(`Lỗi tải file: ${(error as Error).message}`);
+        }
+    }
+
+    private renderAttachedFiles(): void {
+        this.attachedFilesEl.empty();
+
+        if (this.attachedFiles.length === 0) {
+            this.attachedFilesEl.style.display = "none";
+            return;
+        }
+
+        this.attachedFilesEl.style.display = "block";
+        const filesContainer = this.attachedFilesEl.createDiv({ cls: "oca-files-container" });
+
+        for (const filePath of this.attachedFiles) {
+            const chip = filesContainer.createDiv({ cls: "oca-file-chip" });
+
+            // File icon based on extension
+            const fileName = filePath.split("/").pop() || filePath;
+            const extension = fileName.split(".").pop()?.toLowerCase() || "";
+            let icon = "📄";
+            if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(extension)) {
+                icon = "🖼️";
+            } else if (["pdf"].includes(extension)) {
+                icon = "📕";
+            } else if (["doc", "docx", "txt"].includes(extension)) {
+                icon = "📝";
+            }
+
+            const fileNameSpan = chip.createSpan({ text: `${icon} ${fileName}` });
+            fileNameSpan.addClass("oca-file-name");
+
+            // Remove button
+            const removeBtn = chip.createEl("button", {
+                text: "✕",
+                cls: "oca-file-remove"
+            });
+            removeBtn.addEventListener("click", () => {
+                this.removeAttachedFile(filePath);
+            });
+        }
+    }
+
+    private removeAttachedFile(filePath: string): void {
+        this.attachedFiles = this.attachedFiles.filter(f => f !== filePath);
+        this.renderAttachedFiles();
+        new Notice(`Đã xóa: ${filePath.split("/").pop()}`);
+    }
+
     private renderTasksPanel(): void {
         const wrap = this.tasksPanelEl.createDiv({ cls: "oca-tasks-container" });
         wrap.createEl("h4", { text: "Google Tasks" });
 
         const controls = wrap.createDiv({ cls: "oca-tasks-controls" });
-        const listSelect = controls.createEl("select", { cls: "oca-tasks-select" });
 
+        // Task List selection
+        const listSelect = controls.createEl("select", { cls: "oca-tasks-select" });
+        listSelect.addEventListener("change", async (e) => {
+            const selectElement = e.target as HTMLSelectElement;
+            this.selectedTaskListId = selectElement.value;
+            await this.reloadTasks();
+        });
+        this.renderTaskListOptions(listSelect);
+
+        // Refresh button
         const refreshBtn = controls.createEl("button", { text: "↻", cls: "oca-nav-btn" });
         refreshBtn.addEventListener("click", () => this.reloadTasks());
+
+        // Add Task List button
+        const addListBtn = controls.createEl("button", { text: "+ List", cls: "oca-nav-btn" });
+        addListBtn.addEventListener("click", async () => {
+            const title = await new PromptModal(this.app, "Nhập tên danh sách công việc mới:").openAndGetValue();
+            if (title) {
+                try {
+                    await this.plugin.googleTasksApi.createTaskList(title);
+                    await this.reloadTasks();
+                    new Notice(`Đã tạo danh sách công việc: "${title}"`);
+                } catch (error) {
+                    console.error("[CalendarView] Failed to create task list:", error);
+                    new Notice(`Lỗi tạo danh sách: ${(error as Error).message}`);
+                }
+            }
+        });
+
+        // Add Task button
+        const addTaskBtn = controls.createEl("button", { text: "+ Task", cls: "oca-nav-btn" });
+        addTaskBtn.addEventListener("click", async () => {
+            const title = await new PromptModal(this.app, "Nhập tiêu đề công việc mới:").openAndGetValue();
+            if (title && this.selectedTaskListId) {
+                try {
+                    await this.plugin.googleTasksApi.createTask(this.selectedTaskListId, { title });
+                    await this.reloadTasks();
+                    new Notice(`Đã thêm công việc: "${title}"`);
+                } catch (error) {
+                    console.error("[CalendarView] Failed to create task:", error);
+                    new Notice(`Lỗi thêm công việc: ${(error as Error).message}`);
+                }
+            }
+        });
+
+        // Delete Task List button
+        const deleteListBtn = controls.createEl("button", { text: "🗑️", cls: "oca-nav-btn oca-nav-btn-danger" });
+        deleteListBtn.addEventListener("click", async () => {
+            if (!this.selectedTaskListId || this.selectedTaskListId === "@default") {
+                new Notice("Không thể xóa danh sách mặc định hoặc danh sách chưa chọn.");
+                return;
+            }
+            const listTitle = this.taskLists.find(list => list.id === this.selectedTaskListId)?.title || this.selectedTaskListId;
+            if (confirm(`Bạn có chắc chắn muốn xóa danh sách công việc "${listTitle}" không?`)) {
+                try {
+                    await this.plugin.googleTasksApi.deleteTaskList(this.selectedTaskListId);
+                    this.selectedTaskListId = "@default"; // Reset to default
+                    await this.reloadTasks();
+                    new Notice(`Đã xóa danh sách công việc: "${listTitle}"`);
+                } catch (error) {
+                    console.error("[CalendarView] Failed to delete task list:", error);
+                    new Notice(`Lỗi xóa danh sách: ${(error as Error).message}`);
+                }
+            }
+        });
+
 
         const tasksListEl = wrap.createDiv({ cls: "oca-tasks-list" });
 
@@ -273,14 +473,30 @@ export class CalendarView extends ItemView {
         this.reloadTasks();
     }
 
+    private renderTaskListOptions(selectElement: HTMLSelectElement): void {
+        selectElement.empty();
+        for (const list of this.taskLists) {
+            const option = selectElement.createEl("option", { value: list.id, text: list.title });
+            if (list.id === this.selectedTaskListId) {
+                option.selected = true;
+            }
+        }
+    }
+
     private async reloadTasks(): Promise<void> {
         try {
             this.taskLists = await this.plugin.googleTasksApi.listTaskLists({});
-            if (this.taskLists.length > 0) {
-                this.selectedTaskListId = this.taskLists[0].id;
-                this.tasks = await this.plugin.googleTasksApi.listTasks({ tasklist: this.selectedTaskListId });
+            // Ensure selectedTaskListId is valid, otherwise reset to default
+            if (!this.taskLists.some(list => list.id === this.selectedTaskListId)) {
+                this.selectedTaskListId = this.taskLists.length > 0 ? this.taskLists[0].id : "@default";
             }
+            this.tasks = await this.plugin.googleTasksApi.listTasks({ tasklist: this.selectedTaskListId });
             this.renderTasksList();
+            // Update the select element options after reloading lists
+            const listSelect = this.tasksPanelEl.querySelector(".oca-tasks-select") as HTMLSelectElement;
+            if (listSelect) {
+                this.renderTaskListOptions(listSelect);
+            }
         } catch (error) {
             console.error("[CalendarView] reloadTasks failed", error);
             new Notice(`Lỗi tải tasks: ${(error as Error).message}`);
@@ -294,10 +510,85 @@ export class CalendarView extends ItemView {
 
         for (const task of this.tasks) {
             const taskEl = tasksListEl.createDiv({ cls: "oca-task-item" });
-            taskEl.createSpan({ text: task.title });
-            if (task.due) {
-                taskEl.createSpan({ cls: "oca-task-due", text: ` - ${new Date(task.due).toLocaleDateString()}` });
+
+            // Checkbox for completion status
+            const checkbox = taskEl.createEl("input", { type: "checkbox", cls: "oca-task-checkbox" });
+            checkbox.checked = task.status === "completed";
+            checkbox.addEventListener("change", async () => {
+                try {
+                    const newStatus = checkbox.checked ? "completed" : "needsAction";
+                    await this.plugin.googleTasksApi.patchTask(this.selectedTaskListId, task.id!, { status: newStatus });
+                    // Update local task status immediately for responsiveness
+                    task.status = newStatus;
+                    new Notice(`Đã cập nhật trạng thái công việc: "${task.title}"`);
+                    // Re-render to reflect changes, or just update the specific item if performance is an issue
+                    this.renderTasksList(); 
+                } catch (error) {
+                    console.error(`[CalendarView] Failed to update task ${task.id}:`, error);
+                    new Notice(`Lỗi cập nhật trạng thái: ${(error as Error).message}`);
+                    // Revert checkbox if update failed
+                    checkbox.checked = !checkbox.checked;
+                }
+            });
+
+            // Task title and details
+            const contentEl = taskEl.createDiv({ cls: "oca-task-content" });
+            contentEl.createSpan({ text: task.title });
+            if (task.notes) {
+                contentEl.createEl("p", { cls: "oca-task-notes", text: task.notes });
             }
+            if (task.due) {
+                contentEl.createSpan({ cls: "oca-task-due", text: ` - Hạn chót: ${new Date(task.due).toLocaleDateString()}` });
+            }
+
+            // Edit button
+            const editBtn = taskEl.createEl("button", { text: "✏️", cls: "oca-task-action-btn" });
+            editBtn.addEventListener("click", async () => {
+                const newTitle = await new PromptModal(this.app, "Chỉnh sửa tiêu đề công việc:", task.title).openAndGetValue();
+                if (newTitle === null) return; // User cancelled
+
+                const newNotes = await new PromptModal(this.app, "Chỉnh sửa ghi chú công việc:", task.notes || "").openAndGetValue();
+                if (newNotes === null) return; // User cancelled
+
+                const newDueStr = await new PromptModal(this.app, "Nhập hạn chót (YYYY-MM-DD) hoặc để trống:", task.due ? new Date(task.due).toISOString().split('T')[0] : "").openAndGetValue();
+                if (newDueStr === null) return; // User cancelled
+
+                const dueDate = newDueStr ? new Date(newDueStr) : undefined;
+                if (newDueStr && dueDate && isNaN(dueDate.getTime())) {
+                    new Notice("Định dạng ngày không hợp lệ. Vui lòng sử dụng YYYY-MM-DD.");
+                    return;
+                }
+                // Ensure dueDate is a valid Date object before calling toISOString
+                const formattedDueDate = dueDate instanceof Date && !isNaN(dueDate.getTime()) ? dueDate.toISOString() : undefined;
+
+                try {
+                    await this.plugin.googleTasksApi.updateTask(this.selectedTaskListId, task.id!, {
+                        title: newTitle,
+                        notes: newNotes || undefined, // Ensure undefined if empty
+                        due: formattedDueDate
+                    });
+                    await this.reloadTasks(); // Re-render to show updated info
+                    new Notice(`Đã cập nhật công việc: "${task.title}"`);
+                } catch (error) {
+                    console.error(`[CalendarView] Failed to update task ${task.id}:`, error);
+                    new Notice(`Lỗi cập nhật công việc: ${(error as Error).message}`);
+                }
+            });
+
+            // Delete button
+            const deleteBtn = taskEl.createEl("button", { text: "🗑️", cls: "oca-task-action-btn oca-task-action-btn-danger" });
+            deleteBtn.addEventListener("click", async () => {
+                if (confirm(`Bạn có chắc chắn muốn xóa công việc "${task.title}" không?`)) {
+                    try {
+                        await this.plugin.googleTasksApi.deleteTask(this.selectedTaskListId, task.id!);
+                        await this.reloadTasks(); // Re-render to remove the deleted task
+                        new Notice(`Đã xóa công việc: "${task.title}"`);
+                    } catch (error) {
+                        console.error(`[CalendarView] Failed to delete task ${task.id}:`, error);
+                        new Notice(`Lỗi xóa công việc: ${(error as Error).message}`);
+                    }
+                }
+            });
         }
     }
 
@@ -307,14 +598,15 @@ export class CalendarView extends ItemView {
         // Top bar: navigation
         const header = wrap.createDiv({ cls: "oca-calendar-header" });
 
-        const nav = header.createDiv({ cls: "oca-calendar-nav" });
-        const prevBtn = nav.createEl("button", { text: "◀", cls: "oca-nav-btn" });
-        const todayBtn = nav.createEl("button", { text: "Hôm nay", cls: "oca-nav-btn oca-nav-today" });
-        const nextBtn = nav.createEl("button", { text: "▶", cls: "oca-nav-btn" });
+        const navLeft = header.createDiv({ cls: "oca-calendar-nav oca-calendar-nav-left" });
+        const prevBtn = navLeft.createEl("button", { text: "◀", cls: "oca-nav-btn" });
+        const todayBtn = navLeft.createEl("button", { text: "Hôm nay", cls: "oca-nav-btn oca-nav-today" });
+        const nextBtn = navLeft.createEl("button", { text: "▶", cls: "oca-nav-btn" });
 
         this.calendarTitleEl = header.createEl("h4", { cls: "oca-calendar-title" });
 
-        const reloadBtn = header.createEl("button", { text: "↻", cls: "oca-nav-btn" });
+        const navRight = header.createDiv({ cls: "oca-calendar-nav oca-calendar-nav-right" });
+        const reloadBtn = navRight.createEl("button", { text: "↻", cls: "oca-nav-btn" });
 
         prevBtn.addEventListener("click", () => this.navigatePrev());
         todayBtn.addEventListener("click", () => this.navigateToday());
@@ -369,6 +661,13 @@ export class CalendarView extends ItemView {
         } else if (tab === "tasks") {
             this.reloadTasks();
         }
+    }
+
+    private toggleSuggestionDrawer(): void {
+        const drawerEl = this.chatPanelEl.querySelector(".oca-suggestion-drawer");
+        if (!drawerEl) return;
+        drawerEl.classList.toggle("collapsed");
+        drawerEl.classList.toggle("expanded");
     }
 
     // ================================================================
@@ -1763,10 +2062,22 @@ export class CalendarView extends ItemView {
 
     private async handleSubmit(): Promise<void> {
         const text = this.inputEl.value.trim();
-        if (!text) return;
+        if (!text && this.attachedFiles.length === 0) return;
 
         this.inputEl.value = "";
-        await this.sendMessage(text);
+
+        // Build message with attached files info
+        let fullMessage = text;
+        if (this.attachedFiles.length > 0) {
+            const fileList = this.attachedFiles.map(f => f.split("/").pop()).join(", ");
+            fullMessage += `\n\n[Đính kèm: ${fileList}]`;
+        }
+
+        await this.sendMessage(fullMessage);
+
+        // Clear attached files after sending
+        this.attachedFiles = [];
+        this.renderAttachedFiles();
     }
 
     public async sendMessage(text: string): Promise<void> {
@@ -2084,6 +2395,10 @@ export class CalendarView extends ItemView {
 
     private handleWindowFocus = (): void => {
         console.log("[CalendarView] Window focused, reloading events...");
-        void this.reloadCalendarEvents();
+        // Wrap in try-catch to prevent hanging the UI
+        this.reloadCalendarEvents().catch((error) => {
+            console.error("[CalendarView] handleWindowFocus error:", error);
+            // Silent fail - don't block the UI
+        });
     };
 }

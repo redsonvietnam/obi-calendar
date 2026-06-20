@@ -18,7 +18,8 @@
             "DOM",
             "ES2020"
         ],
-        "baseUrl": "."
+        "baseUrl": ".",
+        "ignoreDeprecations": "5.0"
     },
     "include": [
         "src/**/*.ts"

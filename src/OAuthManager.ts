@@ -38,6 +38,7 @@ export class OAuthManager {
             const raw = await this.plugin.loadData();
             const stored = raw?.oauthTokenData as OAuthTokenData | undefined;
             this.tokenData = stored ?? null;
+            console.log("[OAuthManager] Initialized with token data:", this.tokenData ? "present" : "null");
         } catch (error) {
             console.error("[OAuthManager] initialize failed", error);
             this.tokenData = null;
