@@ -18,6 +18,7 @@ import { VaultContext } from "./VaultContext";
 import { SafetyLayer } from "./SafetyLayer";
 import { SettingsTab } from "./SettingsTab";
 import { SyncManager } from "./SyncManager";
+import { Logger } from "./Logger";
 import { AnalysisHistory } from "./AnalysisHistory";
 import { WorkCategoryConfig } from "./WorkCategoryConfig";
 import { DocumentAnalyzer } from "./DocumentAnalyzer";
@@ -322,7 +323,7 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
         try {
             await this.app.workspace.detachLeavesOfType(VIEW_TYPE_CALENDAR_AGENT);
         } catch (error) {
-            console.error("[obsidian-calendar-agent] onunload failed", error);
+            Logger.error("Main", "onunload failed", error);
         }
     }
 

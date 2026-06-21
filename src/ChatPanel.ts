@@ -582,4 +582,14 @@ export class ChatPanel {
     getAbortController(): AbortController | null {
         return this.abortController;
     }
+
+    /**
+     * Cleanup resources
+     */
+    cleanup(): void {
+        if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
+        }
+    }
 }

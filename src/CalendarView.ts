@@ -77,6 +77,7 @@ export class CalendarView extends ItemView {
     }
 
     async onClose(): Promise<void> {
+        this.chatPanel.cleanup();
         this.calendarPanel.cleanup();
         this.dragManager.cleanup();
         this.contentEl.empty();
