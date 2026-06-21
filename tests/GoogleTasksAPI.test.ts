@@ -157,4 +157,167 @@ describe("GoogleTasksAPI", () => {
             await expect(api.deleteTask("list-123", "invalid-id")).rejects.toThrow("[GoogleTasksAPI] DELETE");
         });
     });
+
+    describe("getTaskList", () => {
+        test("should get a specific task list", async () => {
+            (requestUrl as jest.Mock).mockResolvedValue({
+                status: 200,
+                json: { id: "list-123", title: "My List" }
+            });
+
+            const result = await api.getTaskList("list-123");
+            expect(result.id).toBe("list-123");
+            expect(result.title).toBe("My List");
+        });
+
+        test("should throw if tasklistId is missing", async () => {
+            await expect(api.getTaskList("")).rejects.toThrow("tasklistId");
+        });
+    });
+
+    describe("createTaskList", () => {
+        test("should create a new task list", async () => {
+            (requestUrl as jest.Mock).mockResolvedValue({
+                status: 200,
+                json: { id: "list-new", title: "New List" }
+            });
+
+            const result = await api.createTaskList("New List");
+            expect(result.title).toBe("New List");
+        });
+
+        test("should throw if title is missing", async () => {
+            await expect(api.createTaskList("")).rejects.toThrow("title");
+        });
+    });
+
+    describe("deleteTaskList", () => {
+        test("should delete a task list", async () => {
+            (requestUrl as jest.Mock).mockResolvedValue({ status: 204 });
+
+            await api.deleteTaskList("list-123");
+            expect(requestUrl).toHaveBeenCalledWith(expect.objectContaining({
+                method: "DELETE",
+                url: expect.stringContaining("/lists/list-123")
+            }));
+        });
+
+        test("should throw if tasklistId is missing", async () => {
+            await expect(api.deleteTaskList("")).rejects.toThrow("tasklistId");
+        });
+    });
+
+    describe("getTask", () => {
+        test("should get a specific task", async () => {
+            (requestUrl as jest.Mock).mockResolvedValue({
+                status: 200,
+                json: { id: "task-123", title: "My Task", status: "needsAction" }
+            });
+
+            const result = await api.getTask("list-123", "task-123");
+            expect(result.id).toBe("task-123");
+        });
+
+        test("should throw if tasklistId is missing", async () => {
+            await expect(api.getTask("", "task-123")).rejects.toThrow("tasklistId");
+        });
+
+        test("should throw if taskId is missing", async () => {
+            await expect(api.getTask("list-123", "")).rejects.toThrow("taskId");
+        });
+    });
+
+    describe("updateTask", () => {
+        test("should update a task", async () => {
+            (requestUrl as jest.Mock).mockResolvedValue({
+                status: 200,
+                json: { id: "task-123", title: "Updated Task" }
+            });
+
+            const result = await api.updateTask("list-123", "task-123", { title: "Updated Task" });
+            expect(result.title).toBe("Updated Task");
+            expect(requestUrl).toHaveBeenCalledWith(expect.objectContaining({
+                method: "PUT"
+            }));
+        });
+
+        test("should throw if tasklistId is missing", async () => {
+            await expect(api.updateTask("", "task-123", { title: "Test" })).rejects.toThrow("tasklistId");
+        });
+
+        test("should throw if taskId is missing", async () => {
+            await expect(api.updateTask("list-123", "", { title: "Test" })).rejects.toThrow("taskId");
+        });
+    });
+
+    describe("listTasks options", () => {
+        test("should apply showCompleted param", async () => {
+            (requestUrl as jest.Mock).mockResolvedValue({ status: 200, json: { items: [] } });
+
+            await api.listTasks({ tasklist: "list-1", showCompleted: true });
+
+            const calledUrl = (requestUrl as jest.Mock).mock.calls[0][0].url;
+            expect(calledUrl).toContain("showCompleted=true");
+        });
+
+        test("should apply showDeleted param", async () => {
+            (requestUrl as jest.Mock).mockResolvedValue({ status: 200, json: { items: [] } });
+
+            await api.listTasks({ tasklist: "list-1", showDeleted: false });
+
+            const calledUrl = (requestUrl as jest.Mock).mock.calls[0][0].url;
+            expect(calledUrl).toContain("showDeleted=false");
+        });
+
+        test("should apply showHidden param", async () => {
+            (requestUrl as jest.Mock).mockResolvedValue({ status: 200, json: { items: [] } });
+
+            await api.listTasks({ tasklist: "list-1", showHidden: true });
+
+            const calledUrl = (requestUrl as jest.Mock).mock.calls[0][0].url;
+            expect(calledUrl).toContain("showHidden=true");
+        });
+
+        test("should apply sortBy param", async () => {
+            (requestUrl as jest.Mock).mockResolvedValue({ status: 200, json: { items: [] } });
+
+            await api.listTasks({ tasklist: "list-1", sortBy: "updated" });
+
+            const calledUrl = (requestUrl as jest.Mock).mock.calls[0][0].url;
+            expect(calledUrl).toContain("sortBy=updated");
+        });
+
+        test("should apply pageToken param", async () => {
+            (requestUrl as jest.Mock).mockResolvedValue({ status: 200, json: { items: [] } });
+
+            await api.listTasks({ tasklist: "list-1", pageToken: "token-123" });
+
+            const calledUrl = (requestUrl as jest.Mock).mock.calls[0][0].url;
+            expect(calledUrl).toContain("pageToken=token-123");
+        });
+
+        test("should throw if tasklist is empty string", async () => {
+            await expect(api.listTasks({ tasklist: "" })).rejects.toThrow("tasklist");
+        });
+    });
+
+    describe("error handling", () => {
+        test("should handle API error with text body", async () => {
+            (requestUrl as jest.Mock).mockResolvedValue({
+                status: 403,
+                json: { error: { code: 403, message: "Forbidden" } },
+                arrayBuffer: new TextEncoder().encode("Forbidden").buffer
+            });
+
+            await expect(api.listTaskLists()).rejects.toThrow();
+        });
+
+        test("should handle 204 response (no content)", async () => {
+            (requestUrl as jest.Mock).mockResolvedValue({ status: 204 });
+
+            // deleteTask returns void, so we just check it doesn't throw
+            await api.deleteTask("list-123", "task-123");
+            expect(requestUrl).toHaveBeenCalled();
+        });
+    });
 });

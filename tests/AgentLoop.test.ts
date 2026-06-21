@@ -144,4 +144,115 @@ describe("Agent Loop Integration", () => {
         expect(result.toolTrace[0].result.ok).toBe(false);
             expect(result.toolTrace[0].result.error).toContain("Thiếu tham số bắt buộc: summary");
     });
+
+    test("should throw error when API key is missing", async () => {
+        (plugin as any).settings.geminiApiKey = "";
+        
+        await expect(agent.run("Hello", [], "Asia/Ho_Chi_Minh", "")).rejects.toThrow("Thiếu Gemini API key");
+    });
+
+    test("should handle image input", async () => {
+        const mockResponse = {
+            candidates: [{
+                content: {
+                    role: "model",
+                    parts: [{ text: "Tôi thấy hình ảnh." }]
+                }
+            }]
+        };
+
+        const generateContentSpy = jest.spyOn(agent as any, "generateContent");
+        generateContentSpy.mockResolvedValueOnce(mockResponse);
+
+        const result = await agent.run("Phân tích hình này", [], "Asia/Ho_Chi_Minh", "", undefined, undefined, "data:image/jpeg;base64,abc123");
+
+        expect(result.assistantText).toBe("Tôi thấy hình ảnh.");
+    });
+
+    test("should handle abort signal", async () => {
+        const abortController = new AbortController();
+        
+        // Abort before calling run
+        abortController.abort();
+
+        await expect(agent.run("Hello", [], "Asia/Ho_Chi_Minh", "", abortController.signal)).rejects.toThrow("cancelled");
+    });
+
+    test("should handle empty response from Gemini", async () => {
+        const mockResponse = {
+            candidates: [{
+                content: {
+                    role: "model",
+                    parts: []
+                }
+            }]
+        };
+
+        const generateContentSpy = jest.spyOn(agent as any, "generateContent");
+        generateContentSpy.mockResolvedValueOnce(mockResponse);
+
+        await expect(agent.run("Hello")).rejects.toThrow("Gemini không trả nội dung hợp lệ");
+    });
+
+    test("should handle max tool rounds exceeded", async () => {
+        const mockResponse = {
+            candidates: [{
+                content: {
+                    role: "model",
+                    parts: [{
+                        functionCall: {
+                            name: "list_events",
+                            args: { maxResults: 5 }
+                        }
+                    }]
+                }
+            }]
+        };
+
+        const generateContentSpy = jest.spyOn(agent as any, "generateContent");
+        generateContentSpy.mockResolvedValue(mockResponse);
+
+        await expect(agent.run("List events forever")).rejects.toThrow("Vượt quá số vòng");
+    });
+
+    test("should handle API quota error and fallback models", async () => {
+        (requestUrl as jest.Mock).mockResolvedValue({
+            status: 429,
+            text: "Quota exceeded",
+            json: { error: { message: "Quota exceeded" } }
+        });
+
+        await expect(agent.run("Hello")).rejects.toThrow("Không gọi được model Gemini nào");
+    });
+
+    test("should handle model not found error and fallback", async () => {
+        (requestUrl as jest.Mock).mockResolvedValue({
+            status: 404,
+            text: "Model not found",
+            json: { error: { message: "Model not found" } }
+        });
+
+        await expect(agent.run("Hello")).rejects.toThrow("Không gọi được model Gemini nào");
+    });
+
+    test("should handle permission error and fallback", async () => {
+        (requestUrl as jest.Mock).mockResolvedValue({
+            status: 403,
+            text: "Permission denied",
+            json: { error: { message: "Permission denied" } }
+        });
+
+        await expect(agent.run("Hello")).rejects.toThrow("Không gọi được model Gemini nào");
+    });
+
+    test("should summarize long errors", async () => {
+        const longError = "x".repeat(500);
+        (requestUrl as jest.Mock).mockResolvedValue({
+            status: 500,
+            text: longError,
+            json: { error: { message: longError } }
+        });
+
+        await expect(agent.run("Hello")).rejects.toThrow();
+    });
 });
