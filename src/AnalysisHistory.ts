@@ -1,6 +1,7 @@
 import { TFile, normalizePath } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 import { DocumentAnalysis, PatternInsights, WorkCategory } from "./types";
+import { Logger } from "./Logger";
 
 export class AnalysisHistory {
     private readonly BASE_FOLDER = "_document-analysis";
@@ -40,7 +41,7 @@ export class AnalysisHistory {
 
             return analysis.id;
         } catch (error) {
-            console.error("[AnalysisHistory] logAnalysis failed:", error);
+            Logger.error("AnalysisHistory", "logAnalysis failed", error);
             throw error;
         }
     }
@@ -51,7 +52,7 @@ export class AnalysisHistory {
             const filtered = all.filter(a => a.category === category);
             return limit ? filtered.slice(-limit) : filtered;
         } catch (error) {
-            console.error("[AnalysisHistory] getHistoryByCategory failed:", error);
+            Logger.error("AnalysisHistory", "getHistoryByCategory failed", error);
             return [];
         }
     }
@@ -88,7 +89,7 @@ export class AnalysisHistory {
                 dataQuality: analyses.length >= 10 ? "high" : analyses.length >= 5 ? "medium" : "low"
             };
         } catch (error) {
-            console.error("[AnalysisHistory] getPatternsForCategory failed:", error);
+            Logger.error("AnalysisHistory", "getPatternsForCategory failed", error);
             return this.getDefaultPatterns(category);
         }
     }
@@ -112,7 +113,7 @@ export class AnalysisHistory {
                 await this.savePatternFile(entry.category, patterns);
             }
         } catch (error) {
-            console.error("[AnalysisHistory] recordFeedback failed:", error);
+            Logger.error("AnalysisHistory", "recordFeedback failed", error);
             throw error;
         }
     }

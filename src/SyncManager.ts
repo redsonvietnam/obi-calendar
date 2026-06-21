@@ -2,6 +2,7 @@ import { TFile, Notice } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 import { GoogleTasksAPI } from "./GoogleTasksAPI";
 import { GoogleCalendarAPI } from "./GoogleCalendarAPI";
+import { Logger } from "./Logger";
 
 /**
  * SyncManager handles the bidirectional synchronization between Google services and Obsidian.
@@ -43,12 +44,12 @@ export class SyncManager {
                 try {
                     await this.syncObsidianTasksToGoogle(file as TFile);
                 } catch (error) {
-                    console.error(`[SyncManager] Error syncing Obsidian task from file ${file.path}:`, error);
+                    Logger.error("SyncManager", `Error syncing Obsidian task from file ${file.path}`, error);
                 }
             }
         };
         this.plugin.app.vault.on("modify", this.fileModifyListener as any);
-        console.log("[SyncManager] File modification listener registered.");
+        Logger.info("SyncManager", "File modification listener registered.");
     }
 
     /**
@@ -64,10 +65,10 @@ export class SyncManager {
                 // This syncAll will handle Google -> Obsidian sync
                 await this.syncAll();
             } catch (error) {
-                console.error("[SyncManager] Auto-sync (Google -> Obsidian) failed", error);
+                Logger.error("SyncManager", "Auto-sync (Google -> Obsidian) failed", error);
             }
         }, interval);
-        console.log(`[SyncManager] Auto-sync started every ${this.plugin.settings.sync.intervalMinutes} minutes`);
+        Logger.info("SyncManager", `Auto-sync started every ${this.plugin.settings.sync.intervalMinutes} minutes`);
     }
 
     /**
@@ -78,7 +79,7 @@ export class SyncManager {
         if (this.fileModifyListener) {
             this.plugin.app.vault.off("modify", this.fileModifyListener as any);
             this.fileModifyListener = undefined;
-            console.log("[SyncManager] File modification listener unregistered.");
+            Logger.info("SyncManager", "File modification listener unregistered.");
         }
     }
 
@@ -98,7 +99,7 @@ export class SyncManager {
      * Obsidian -> Google sync is handled by the file modification listener.
      */
     async syncAll(): Promise<{ tasksUpdated: number; calendarUpdated: number; errors: string[] }> {
-        console.log("[SyncManager] Starting full sync (Google -> Obsidian)...");
+        Logger.info("SyncManager", "Starting full sync (Google -> Obsidian)...");
         const results = {
             tasksUpdated: 0, // Google -> Obsidian tasks
             calendarUpdated: 0,
@@ -122,9 +123,9 @@ export class SyncManager {
         }
 
         if (results.errors.length > 0) {
-            console.error("[SyncManager] Sync completed with errors:", results.errors);
+            Logger.error("SyncManager", "Sync completed with errors:", results.errors);
         } else {
-            console.log(`[SyncManager] Sync completed. Tasks updated: ${results.tasksUpdated}, Calendar updated: ${results.calendarUpdated}`);
+            Logger.info("SyncManager", `Sync completed. Tasks updated: ${results.tasksUpdated}, Calendar updated: ${results.calendarUpdated}`);
         }
 
         return results;
@@ -190,7 +191,7 @@ export class SyncManager {
 
         let file: TFile | null = this.plugin.app.vault.getAbstractFileByPath(dailyNotePath) as TFile;
         if (!file || !(file instanceof TFile)) {
-            console.log(`[SyncManager] Daily note not found for today: ${dailyNotePath}. Attempting to create it.`);
+            Logger.debug("SyncManager", `Daily note not found for today: ${dailyNotePath}. Attempting to create it.`);
             try {
                 // Ensure the parent directory exists before creating the file
                 const folderPath = this.plugin.settings.dailyNotesFolder;
@@ -201,7 +202,7 @@ export class SyncManager {
                 file = await this.plugin.app.vault.create(dailyNotePath, "");
                 new Notice(`Đã tạo ghi chú hàng ngày cho hôm nay: ${dailyNotePath}`);
             } catch (error) {
-                console.error(`[SyncManager] Failed to create daily note ${dailyNotePath}:`, error);
+                Logger.error("SyncManager", `Failed to create daily note ${dailyNotePath}`, error);
                 new Notice(`Không thể tạo ghi chú hàng ngày: ${dailyNotePath}. Vui lòng kiểm tra quyền hoặc đường dẫn thư mục.`);
                 return 0;
             }
@@ -274,17 +275,17 @@ export class SyncManager {
                                     status: 'completed'
                                 });
                                 updatedCount++;
-                                console.log(`[SyncManager] Marked Google Task ${taskId} as completed.`);
+                                Logger.debug("SyncManager", `Marked Google Task ${taskId} as completed.`);
                             } else if (needsActionInObsidian && googleStatus !== 'needsAction') {
                                 await this.googleTasksApi.patchTask("@default", taskId, {
                                     status: 'needsAction'
                                 });
                                 updatedCount++;
-                                console.log(`[SyncManager] Marked Google Task ${taskId} as needsAction.`);
+                                Logger.debug("SyncManager", `Marked Google Task ${taskId} as needsAction.`);
                             }
                         }
                     } catch (error) {
-                        console.error(`[SyncManager] Failed to update Google Task ${taskId} for file ${file.path}:`, error);
+                        Logger.error("SyncManager", `Failed to update Google Task ${taskId} for file ${file.path}`, error);
                         // Optionally add error to a results array if needed
                     }
                 }

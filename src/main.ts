@@ -106,9 +106,9 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
                         // Mở URL OAuth bằng API browser chuẩn để tránh phụ thuộc version Obsidian.
                         window.open(authUrl, "_blank");
                         new Notice("Đã mở Google OAuth URL trên trình duyệt mặc định.");
-                        console.log("[obsidian-calendar-agent] OAuth URL:", authUrl);
+                        Logger.info("Main", "OAuth URL generated");
                     } catch (error) {
-                        console.error("[obsidian-calendar-agent] oauth generate url failed", error);
+                        Logger.error("Main", "oauth generate url failed", error);
                         new Notice(`OAuth lỗi: ${(error as Error).message}`);
                     }
                 }
@@ -136,7 +136,7 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
                         await this.oauthManager.exchangeCodeForToken(code);
                         new Notice("OAuth exchange thành công.");
                     } catch (error) {
-                        console.error("[obsidian-calendar-agent] oauth exchange failed", error);
+                        Logger.error("Main", "oauth exchange failed", error);
                         new Notice(`OAuth exchange lỗi: ${(error as Error).message}`);
                     }
                 }
@@ -149,9 +149,9 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
                     try {
                         const events = await this.googleCalendarApi.listEvents({ maxResults: 10 });
                         new Notice(`List events OK. Số event nhận được: ${events.length}`);
-                        console.log("[obsidian-calendar-agent] listEvents result:", events);
+                        Logger.debug("Main", "listEvents result:", events);
                     } catch (error) {
-                        console.error("[obsidian-calendar-agent] list events test failed", error);
+                        Logger.error("Main", "list events test failed", error);
                         new Notice(`List events lỗi: ${(error as Error).message}`);
                     }
                 }
@@ -164,9 +164,9 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
                     try {
                         const tasks = await this.googleTasksApi.listTasks({ maxResults: 10 });
                         new Notice(`List tasks OK. Số task nhận được: ${tasks.length}`);
-                        console.log("[obsidian-calendar-agent] listTasks result:", tasks);
+                        Logger.debug("Main", "listTasks result:", tasks);
                     } catch (error) {
-                        console.error("[obsidian-calendar-agent] list tasks test failed", error);
+                        Logger.error("Main", "list tasks test failed", error);
                         new Notice(`List tasks lỗi: ${(error as Error).message}`);
                     }
                 }
@@ -188,12 +188,12 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
                             vaultSnapshot
                         );
 
-                        console.log("[obsidian-calendar-agent] Gemini hardcoded test result:", result);
+                        Logger.debug("Main", "Gemini hardcoded test result:", result);
                         new Notice(
                             `Gemini test OK. Tool calls: ${result.toolTrace.length}. Xem console để kiểm tra chi tiết.`
                         );
                     } catch (error) {
-                        console.error("[obsidian-calendar-agent] gemini hardcoded test failed", error);
+                        Logger.error("Main", "gemini hardcoded test failed", error);
                         new Notice(`Gemini test lỗi: ${(error as Error).message}`);
                     }
                 }
@@ -206,10 +206,10 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
                     try {
                         const ok = await this.safetyLayer.undoLast();
                         if (!ok) {
-                            console.warn("[obsidian-calendar-agent] undo last returned false");
+                            Logger.warn("Main", "undo last returned false");
                         }
                     } catch (error) {
-                        console.error("[obsidian-calendar-agent] undo command failed", error);
+                        Logger.error("Main", "undo command failed", error);
                         new Notice(`Undo lỗi: ${(error as Error).message}`);
                     }
                 }
@@ -221,12 +221,12 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
                 callback: async () => {
                     try {
                         const snapshot = await this.vaultContext.buildSnapshot();
-                        console.log("[obsidian-calendar-agent] vault context snapshot:", snapshot);
+                        Logger.debug("Main", "vault context snapshot:", snapshot);
                         new Notice(
                             `Vault context OK. Daily: ${snapshot.dailyNotes.length}, Tasks: ${snapshot.openTasks.length}, Projects: ${snapshot.projects.length}`
                         );
                     } catch (error) {
-                        console.error("[obsidian-calendar-agent] vault context test failed", error);
+                        Logger.error("Main", "vault context test failed", error);
                         new Notice(`Vault context lỗi: ${(error as Error).message}`);
                     }
                 }
@@ -313,7 +313,7 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
                 })
             );
         } catch (error) {
-            console.error("[obsidian-calendar-agent] onload failed", error);
+            Logger.error("Main", "onload failed", error);
             new Notice("Calendar Agent: Plugin load thất bại. Xem console để biết chi tiết.");
             throw error;
         }
@@ -426,7 +426,7 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
 
             workspace.revealLeaf(leaf);
         } catch (error) {
-            console.error("[obsidian-calendar-agent] activateView failed", error);
+            Logger.error("Main", "activateView failed", error);
             new Notice("Calendar Agent: Không mở được sidebar.");
         }
     }
@@ -444,7 +444,7 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
             }
             workspace.revealLeaf(leaf);
         } catch (error) {
-            console.error("[obsidian-calendar-agent] activateInsightsDashboard failed", error);
+            Logger.error("Main", "activateInsightsDashboard failed", error);
             new Notice("Không mở được Insights Dashboard.");
         }
     }
@@ -457,7 +457,7 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
                 ...(loaded?.settings ?? {})
             };
         } catch (error) {
-            console.error("[obsidian-calendar-agent] load settings failed", error);
+            Logger.error("Main", "load settings failed", error);
             this.settings = { ...DEFAULT_SETTINGS };
         }
     }
@@ -473,7 +473,7 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
                 this.syncManager.startAutoSync();
             }
         } catch (error) {
-            console.error("[obsidian-calendar-agent] save settings failed", error);
+            Logger.error("Main", "save settings failed", error);
             new Notice("Calendar Agent: Không lưu được settings.");
         }
     }

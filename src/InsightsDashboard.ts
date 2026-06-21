@@ -3,6 +3,7 @@ import type ObsidianCalendarAgentPlugin from "./main";
 import { AnalysisHistory } from "./AnalysisHistory";
 import { WorkCategoryConfig } from "./WorkCategoryConfig";
 import { WorkCategory, PatternInsights } from "./types";
+import { Logger } from "./Logger";
 
 export const VIEW_TYPE_INSIGHTS_DASHBOARD = "obsidian-calendar-agent-insights";
 
@@ -57,7 +58,7 @@ export class InsightsDashboard extends ItemView {
                 this.renderRecentFeedback(contentEl, analysisHistory, categories);
             }
         } catch (error) {
-            console.error("[InsightsDashboard] render failed:", error);
+            Logger.error("InsightsDashboard", "render failed", error);
             contentEl.createEl("p", { text: "Lỗi tải dữ liệu." });
         }
     }

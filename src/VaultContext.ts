@@ -1,4 +1,5 @@
 import type ObsidianCalendarAgentPlugin from "./main";
+import { Logger } from "./Logger";
 
 export interface VaultDailyNoteContext {
     date: string;
@@ -143,7 +144,7 @@ export class VaultContext {
             // `read` yêu cầu TFile, ở đây cast an toàn vì path lấy từ getMarkdownFiles()
             return await this.plugin.app.vault.cachedRead(file as never);
         } catch (error) {
-            console.error("[VaultContext] read file failed", path, error);
+            Logger.error("VaultContext", "read file failed", error);
             return "";
         }
     }

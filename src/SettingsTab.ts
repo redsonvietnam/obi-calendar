@@ -6,6 +6,7 @@ import {
 } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 import { DEFAULT_TIMEZONE } from "./types";
+import { Logger } from "./Logger";
 
 /**
  * Settings UI cho obsidian-calendar-agent.
@@ -273,7 +274,7 @@ export class SettingsTab extends PluginSettingTab {
                         window.open(authUrl, "_blank");
                         new Notice("Đã mở OAuth URL.");
                     } catch (error) {
-                        console.error("[SettingsTab] open auth url failed", error);
+                        Logger.error("SettingsTab", "open auth url failed", error);
                         new Notice(`Lỗi OAuth: ${(error as Error).message}`);
                     }
                 })
@@ -311,7 +312,7 @@ export class SettingsTab extends PluginSettingTab {
                         await this.plugin.oauthManager.exchangeCodeForToken(code);
                         new Notice("OAuth exchange thành công.");
                     } catch (error) {
-                        console.error("[SettingsTab] exchange failed", error);
+                        Logger.error("SettingsTab", "exchange failed", error);
                         new Notice(`Exchange lỗi: ${(error as Error).message}`);
                     }
                 })
@@ -329,7 +330,7 @@ export class SettingsTab extends PluginSettingTab {
                             await this.plugin.oauthManager.clearToken();
                             new Notice("Đã xóa token OAuth.");
                         } catch (error) {
-                            console.error("[SettingsTab] clear token failed", error);
+                            Logger.error("SettingsTab", "clear token failed", error);
                             new Notice(`Clear token lỗi: ${(error as Error).message}`);
                         }
                     })

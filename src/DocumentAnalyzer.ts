@@ -4,6 +4,7 @@ import { GeminiAgent } from "./GeminiAgent";
 import { AnalysisHistory } from "./AnalysisHistory";
 import { VaultContext } from "./VaultContext";
 import { WorkCategoryConfig } from "./WorkCategoryConfig";
+import { Logger } from "./Logger";
 import {
     DocumentAnalysisResult,
     DocumentAnalysis,
@@ -59,7 +60,7 @@ export class DocumentAnalyzer {
             };
             return analysisResult;
         } catch (error) {
-            console.error("[DocumentAnalyzer] analyzeDocument failed:", error);
+            Logger.error("DocumentAnalyzer", "analyzeDocument failed", error);
             new Notice(`Lỗi phân tích tài liệu: ${(error as Error).message}`);
             throw error;
         }
@@ -188,7 +189,7 @@ export class DocumentAnalyzer {
                 riskLevel: this.parseRiskLevel(parsed.riskLevel)
             };
         } catch (error) {
-            console.error("[DocumentAnalyzer] JSON parse error:", error, "Raw:", jsonMatch[0]);
+            Logger.error("DocumentAnalyzer", "JSON parse error", error);
             throw new Error("Không thể parse kết quả phân tích từ Gemini.");
         }
     }
