@@ -1,6 +1,10 @@
 import { Notice, Platform, requestUrl } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 import { OAuthTokenData } from "./types";
+import { EncryptionUtils } from "./EncryptionUtils";
+import { Logger } from "./Logger";
+
+
 
 /**
  * Quản lý OAuth2 PKCE cho Google Calendar.
@@ -36,11 +40,26 @@ export class OAuthManager {
     async initialize(): Promise<void> {
         try {
             const raw = await this.plugin.loadData();
-            const stored = raw?.oauthTokenData as OAuthTokenData | undefined;
-            this.tokenData = stored ?? null;
-            console.log("[OAuthManager] Initialized with token data:", this.tokenData ? "present" : "null");
+            const storedEncrypted = raw?.oauthTokenData as string | undefined;
+            
+            if (storedEncrypted && typeof storedEncrypted === 'string') {
+                try {
+                    const decrypted = EncryptionUtils.decrypt(
+                        storedEncrypted, 
+                        EncryptionUtils.getDeviceSecret()
+                    );
+                    this.tokenData = JSON.parse(decrypted) as OAuthTokenData;
+                } catch (e) {
+                    Logger.error("OAuthManager", "Decryption failed", e);
+                    this.tokenData = null;
+                }
+            } else {
+                this.tokenData = storedEncrypted as OAuthTokenData | null;
+            }
+            
+            Logger.info("OAuthManager", `Initialized with token data: ${this.tokenData ? "present" : "null"}`);
         } catch (error) {
-            console.error("[OAuthManager] initialize failed", error);
+            Logger.error("OAuthManager", "initialize failed", error);
             this.tokenData = null;
         }
     }
@@ -289,7 +308,17 @@ export class OAuthManager {
 
     private async persistTokenData(): Promise<void> {
         const base = (await this.plugin.loadData()) ?? {};
-        base.oauthTokenData = this.tokenData;
+        
+        if (this.tokenData) {
+            const json = JSON.stringify(this.tokenData);
+            base.oauthTokenData = EncryptionUtils.encrypt(
+                json, 
+                EncryptionUtils.getDeviceSecret()
+            );
+        } else {
+            base.oauthTokenData = null;
+        }
+        
         await this.plugin.saveData(base);
     }
 

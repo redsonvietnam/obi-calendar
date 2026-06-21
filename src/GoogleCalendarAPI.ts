@@ -5,6 +5,10 @@ import {
     DEFAULT_TIMEZONE,
     GoogleCalendarEvent
 } from "./types";
+import { Logger } from "./Logger";
+import { RetryUtils } from "./RetryUtils";
+
+
 
 export interface ListEventsParams {
     calendarId?: string;
@@ -112,41 +116,50 @@ export class GoogleCalendarAPI {
         path: string,
         body?: unknown
     ): Promise<T> {
-        const accessToken = await this.oauthManager.getValidAccessToken();
-        const url = `${GoogleCalendarAPI.BASE_URL}${path}`;
+        return RetryUtils.withRetry(
+            async () => {
+                const accessToken = await this.oauthManager.getValidAccessToken();
+                const url = `${GoogleCalendarAPI.BASE_URL}${path}`;
 
-        const headers: Record<string, string> = {
-            Authorization: `Bearer ${accessToken}`
-        };
+                const headers: Record<string, string> = {
+                    Authorization: `Bearer ${accessToken}`
+                };
 
-        let requestBody: string | undefined;
-        if (body !== undefined) {
-            headers["Content-Type"] = "application/json";
-            requestBody = JSON.stringify(body);
-        }
+                let requestBody: string | undefined;
+                if (body !== undefined) {
+                    headers["Content-Type"] = "application/json";
+                    requestBody = JSON.stringify(body);
+                }
 
-        const response = await requestUrl({
-            url,
-            method,
-            headers,
-            body: requestBody,
-            throw: false
-        });
+                const response = await requestUrl({
+                    url,
+                    method,
+                    headers,
+                    body: requestBody,
+                    throw: false
+                });
 
-        if (response.status < 200 || response.status >= 300) {
-            const apiError = this.parseApiError(response);
-            const err = new Error(
-                `[GoogleCalendarAPI] ${method} ${path} failed: ${apiError.code} ${apiError.message}`
-            ) as Error & { apiError?: GoogleCalendarApiError };
-            err.apiError = apiError;
-            throw err;
-        }
+                if (response.status < 200 || response.status >= 300) {
+                    const apiError = this.parseApiError(response);
+                    Logger.error("GoogleCalendarAPI", `Request failed: ${method} ${path}`, response);
+                    const err = new Error(
+                        `[GoogleCalendarAPI] ${method} ${path} failed: ${apiError.code} ${apiError.message}`
+                    ) as Error & { apiError?: GoogleCalendarApiError };
+                    err.apiError = apiError;
+                    throw err;
+                }
 
-        if (response.status === 204) {
-            return undefined as T;
-        }
+                if (response.status === 204) {
+                    return undefined as T;
+                }
 
-        return response.json as T;
+                return response.json as T;
+            },
+            { maxRetries: 3, initialDelay: 1000, backoffFactor: 2 },
+            (attempt, error) => {
+                Logger.warn("GoogleCalendarAPI", `Retry attempt ${attempt} for ${method} ${path}`, error);
+            }
+        );
     }
 
     /**

@@ -13,6 +13,7 @@
 import { Notice } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 import { GoogleCalendarEvent } from "./types";
+import { Logger } from "./Logger";
 
 /**
  * State for an active drag operation
@@ -365,14 +366,14 @@ export class DragManager {
         isAllDay: boolean
     ): Promise<void> {
         if (!this.onEventDrop) {
-            console.warn("[DragManager] onEventDrop callback not set");
+            Logger.warn("DragManager", "onEventDrop callback not set");
             return;
         }
 
         try {
             await this.onEventDrop(event, newStart, newEnd, isAllDay);
         } catch (error) {
-            console.error("[DragManager] Event drop failed:", error);
+            Logger.error("DragManager", "Event drop failed:", error);
             new Notice(
                 `Lỗi di chuyển sự kiện: ${(error as Error).message}`
             );

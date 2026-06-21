@@ -6,6 +6,7 @@ import { DEFAULT_TIMEZONE, GoogleCalendarEvent, GoogleTask, GoogleTaskList } fro
 import { VaultContext } from "./VaultContext";
 import { SafetyLayer } from "./SafetyLayer";
 import { OAuthManager } from "./OAuthManager"; // Import OAuthManager
+import { Logger } from "./Logger";
 
 export interface ToolDefinition {
     name: string;
@@ -382,7 +383,7 @@ export class CalendarTools {
             const data = await executor(call.arguments ?? {});
             return { ok: true, data };
         } catch (error) {
-            console.error("[CalendarTools] executeTool failed", error);
+            Logger.error("CalendarTools", "executeTool failed", error);
             return {
                 ok: false,
                 error: (error as Error).message

@@ -12,10 +12,10 @@
 
 import { Notice, App } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
-import { GoogleCalendarEvent } from "./types";
+import { CalendarViewMode, GoogleCalendarEvent } from "./types";
 import { DragManager, DragState } from "./DragManager";
+import { Logger } from "./Logger";
 
-type CalendarViewMode = "day" | "week" | "month" | "timeline";
 
 interface CalendarDayCell {
     date: Date;
@@ -175,7 +175,7 @@ export class CalendarPanel {
     /**
      * Render calendar based on current view mode
      */
-    private renderCalendarView(): void {
+    public renderCalendarView(): void {
         this.updateCalendarTitle();
 
         switch (this.viewMode) {
@@ -302,7 +302,7 @@ export class CalendarPanel {
     /**
      * Reload calendar events from API
      */
-    private async reloadCalendarEvents(): Promise<void> {
+    public async reloadCalendarEvents(): Promise<void> {
         if (this.isLoadingCalendar) return;
 
         this.isLoadingCalendar = true;
@@ -317,7 +317,7 @@ export class CalendarPanel {
 
             this.renderCalendarView();
         } catch (error) {
-            console.error("[CalendarPanel] Failed to load events:", error);
+            Logger.error("CalendarPanel", "Failed to load events:", error);
             new Notice(
                 `Lỗi tải sự kiện: ${(error as Error).message}`
             );

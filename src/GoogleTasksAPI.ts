@@ -6,6 +6,9 @@ import {
     GoogleTaskList,
     DEFAULT_TIMEZONE
 } from "./types";
+import { Logger } from "./Logger";
+import { RetryUtils } from "./RetryUtils";
+
 
 export interface ListTaskListsParams {
     maxResults?: number;
@@ -177,49 +180,56 @@ export class GoogleTasksAPI {
         path: string,
         body?: unknown
     ): Promise<T> {
-        const accessToken = await this.oauthManager.getValidAccessToken();
-        if (!accessToken) {
-            throw new Error("[GoogleTasksAPI] Không có access token hợp lệ. Vui lòng kiểm tra cài đặt OAuth.");
-        }
+        return RetryUtils.withRetry(
+            async () => {
+                const accessToken = await this.oauthManager.getValidAccessToken();
+                if (!accessToken) {
+                    throw new Error("[GoogleTasksAPI] Không có access token hợp lệ. Vui lòng kiểm tra cài đặt OAuth.");
+                }
 
-        const url = `${GoogleTasksAPI.BASE_URL}${path}`;
-        console.log(`[GoogleTasksAPI] Calling URL: ${url}`);
+                const url = `${GoogleTasksAPI.BASE_URL}${path}`;
+                Logger.debug("GoogleTasksAPI", `Calling URL: ${url}`);
 
-        const headers: Record<string, string> = {
-            Authorization: `Bearer ${accessToken}`
-        };
-        console.log(`[GoogleTasksAPI] Headers:`, headers);
+                const headers: Record<string, string> = {
+                    Authorization: `Bearer ${accessToken}`
+                };
+                Logger.debug("GoogleTasksAPI", `Headers:`, headers);
 
-        let requestBody: string | undefined;
-        if (body !== undefined) {
-            headers["Content-Type"] = "application/json";
-            requestBody = JSON.stringify(body);
-        }
+                let requestBody: string | undefined;
+                if (body !== undefined) {
+                    headers["Content-Type"] = "application/json";
+                    requestBody = JSON.stringify(body);
+                }
 
-        const response = await requestUrl({
-            url,
-            method,
-            headers,
-            body: requestBody,
-            throw: false
-        });
+                const response = await requestUrl({
+                    url,
+                    method,
+                    headers,
+                    body: requestBody,
+                    throw: false
+                });
 
-        if (response.status < 200 || response.status >= 300) {
-            const apiError = this.parseApiError(response);
-            console.error(`[GoogleTasksAPI] Request failed: ${method} ${url}`);
-            console.error(`[GoogleTasksAPI] Response:`, response);
-            const err = new Error(
-                `[GoogleTasksAPI] ${method} ${path} failed: ${apiError.code} ${apiError.message}. Chi tiết: ${JSON.stringify(apiError.details)}`
-            ) as Error & { apiError?: GoogleTasksAPIError };
-            err.apiError = apiError;
-            throw err;
-        }
+                if (response.status < 200 || response.status >= 300) {
+                    const apiError = this.parseApiError(response);
+                    Logger.error("GoogleTasksAPI", `Request failed: ${method} ${url}`, response);
+                    const err = new Error(
+                        `[GoogleTasksAPI] ${method} ${path} failed: ${apiError.code} ${apiError.message}. Chi tiết: ${JSON.stringify(apiError.details)}`
+                    ) as Error & { apiError?: GoogleTasksAPIError };
+                    err.apiError = apiError;
+                    throw err;
+                }
 
-        if (response.status === 204) {
-            return undefined as T;
-        }
+                if (response.status === 204) {
+                    return undefined as T;
+                }
 
-        return response.json as T;
+                return response.json as T;
+            },
+            { maxRetries: 3, initialDelay: 1000, backoffFactor: 2 },
+            (attempt, error) => {
+                Logger.warn("GoogleTasksAPI", `Retry attempt ${attempt} for ${method} ${path}`, error);
+            }
+        );
     }
 
     private parseApiError(response: RequestUrlResponse): GoogleTasksAPIError {

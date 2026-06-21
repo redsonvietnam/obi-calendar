@@ -6,7 +6,10 @@
     "scripts": {
         "build": "node esbuild.config.mjs production",
         "dev": "node esbuild.config.mjs",
-        "build:deploy": "npm run build && copy main.js \"G:\\My Drive\\FezNote\\.obsidian\\plugins\\obsidian-calendar-agent\\main.js\" && copy manifest.json \"G:\\My Drive\\FezNote\\.obsidian\\plugins\\obsidian-calendar-agent\\manifest.json\" && copy styles.css \"G:\\My Drive\\FezNote\\.obsidian\\plugins\\obsidian-calendar-agent\\styles.css\""
+        "build:deploy": "npm run build && copy main.js \"G:\\My Drive\\FezNote\\.obsidian\\plugins\\obsidian-calendar-agent\\main.js\" && copy manifest.json \"G:\\My Drive\\FezNote\\.obsidian\\plugins\\obsidian-calendar-agent\\manifest.json\" && copy styles.css \"G:\\My Drive\\FezNote\\.obsidian\\plugins\\obsidian-calendar-agent\\styles.css\" && copy styles-chat.css \"G:\\My Drive\\FezNote\\.obsidian\\plugins\\obsidian-calendar-agent\\styles-chat.css\" && copy styles-calendar.css \"G:\\My Drive\\FezNote\\.obsidian\\plugins\\obsidian-calendar-agent\\styles-calendar.css\"",
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage"
     },
     "keywords": [
         "obsidian",
@@ -18,10 +21,16 @@
     "author": "calendar-agent",
     "license": "MIT",
     "devDependencies": {
+        "@types/jest": "^30.0.0",
         "@types/node": "^20.14.11",
         "codegraph": "^1.0.0",
         "esbuild": "^0.23.0",
+        "jest": "^30.4.2",
         "obsidian": "^1.6.7",
+        "ts-jest": "^29.4.11",
         "typescript": "^5.5.4"
+    },
+    "dependencies": {
+        "crypto-js": "^4.2.0"
     }
 }

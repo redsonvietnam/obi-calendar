@@ -1,0 +1,92 @@
+/* ============================================
+   Obsidian Calendar Agent - Google Tasks UI Styles
+   ============================================ */
+
+:root {
+    --oca-task-spacing-xs: 4px;
+    --oca-task-spacing-sm: 6px;
+    --oca-task-spacing-md: 12px;
+    --oca-task-spacing-lg: 20px;
+    --oca-task-radius-sm: 5px;
+    --oca-task-radius-md: 8px;
+}
+
+/* Tasks container */
+.oca-tasks-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: var(--oca-task-spacing-md);
+    gap: var(--oca-task-spacing-sm);
+}
+
+/* Tasks header */
+.oca-tasks-container h4 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+/* Controls */
+.oca-tasks-controls {
+    display: flex;
+    gap: var(--oca-task-spacing-sm);
+    align-items: center;
+}
+
+/* Select dropdown */
+.oca-tasks-select {
+    flex: 1;
+    padding: 3px 6px;
+    border: 1px solid var(--divider-color);
+    border-radius: var(--oca-task-radius-sm);
+    background: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 12px;
+}
+
+/* Task list */
+.oca-tasks-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Single task item */
+.oca-task-item {
+    display: flex;
+    align-items: center;
+    gap: var(--oca-task-spacing-sm);
+    padding: 4px 8px;
+    border-radius: var(--oca-task-radius-sm);
+    font-size: 12px;
+    transition: background 0.12s;
+    cursor: default;
+}
+
+/* Hover effect */
+.oca-task-item:hover {
+    background: var(--background-modifier-hover);
+}
+
+/* Due date */
+.oca-task-due {
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-left: auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    .oca-tasks-container {
+        padding: var(--oca-task-spacing-sm);
+    }
+
+    .oca-task-item {
+        font-size: 11px;
+        padding: 3px 6px;
+    }
+}

@@ -13,6 +13,7 @@ import { Notice, App } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 import { GoogleTask, GoogleTaskList } from "./types";
 import { PromptModal } from "./PromptModal";
+import { Logger } from "./Logger";
 
 /**
  * TasksPanel manages the Google Tasks interface
@@ -135,7 +136,7 @@ export class TasksPanel {
             await this.reloadTasks();
             new Notice(`Đã tạo danh sách công việc: "${title}"`);
         } catch (error) {
-            console.error("[TasksPanel] Failed to create task list:", error);
+            Logger.error("TasksPanel", "Failed to create task list:", error);
             new Notice(
                 `Lỗi tạo danh sách: ${(error as Error).message}`
             );
@@ -166,7 +167,7 @@ export class TasksPanel {
             await this.reloadTasks();
             new Notice(`Đã thêm công việc: "${title}"`);
         } catch (error) {
-            console.error("[TasksPanel] Failed to create task:", error);
+            Logger.error("TasksPanel", "Failed to create task:", error);
             new Notice(`Lỗi thêm công việc: ${(error as Error).message}`);
         }
     }
@@ -206,7 +207,7 @@ export class TasksPanel {
             await this.reloadTasks();
             new Notice(`Đã xóa danh sách công việc: "${listTitle}"`);
         } catch (error) {
-            console.error("[TasksPanel] Failed to delete task list:", error);
+            Logger.error("TasksPanel", "Failed to delete task list:", error);
             new Notice(
                 `Lỗi xóa danh sách: ${(error as Error).message}`
             );
@@ -266,7 +267,7 @@ export class TasksPanel {
                 this.renderTaskListOptions(listSelect);
             }
         } catch (error) {
-            console.error("[TasksPanel] reloadTasks failed", error);
+            Logger.error("TasksPanel", "reloadTasks failed", error);
             new Notice(`Lỗi tải tasks: ${(error as Error).message}`);
         }
     }
@@ -366,10 +367,7 @@ export class TasksPanel {
             );
             this.renderTasksList();
         } catch (error) {
-            console.error(
-                `[TasksPanel] Failed to update task ${task.id}:`,
-                error
-            );
+            Logger.error("TasksPanel", `Failed to update task ${task.id}:`, error);
             new Notice(
                 `Lỗi cập nhật trạng thái: ${(error as Error).message}`
             );
@@ -439,10 +437,7 @@ export class TasksPanel {
             await this.reloadTasks();
             new Notice(`Đã cập nhật công việc: "${task.title}"`);
         } catch (error) {
-            console.error(
-                `[TasksPanel] Failed to update task ${task.id}:`,
-                error
-            );
+            Logger.error("TasksPanel", `Failed to update task ${task.id}:`, error);
             new Notice(
                 `Lỗi cập nhật công việc: ${(error as Error).message}`
             );
@@ -470,10 +465,7 @@ export class TasksPanel {
             await this.reloadTasks();
             new Notice(`Đã xóa công việc: "${task.title}"`);
         } catch (error) {
-            console.error(
-                `[TasksPanel] Failed to delete task ${task.id}:`,
-                error
-            );
+            Logger.error("TasksPanel", `Failed to delete task ${task.id}:`, error);
             new Notice(
                 `Lỗi xóa công việc: ${(error as Error).message}`
             );

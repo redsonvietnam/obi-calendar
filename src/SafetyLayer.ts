@@ -1,6 +1,7 @@
 import { Modal, Notice, Setting } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 import { DocumentAnalysisResult, PatternInsights } from "./types";
+import { Logger } from "./Logger";
 
 export type SafetyActionType = "create_event" | "update_event" | "delete_event" | "write_note" | "analyze_document";
 
@@ -44,7 +45,7 @@ export class SafetyLayer {
             }
             return accepted;
         } catch (error) {
-            console.error("[SafetyLayer] confirm failed", error);
+            Logger.error("SafetyLayer", "confirm failed", error);
             new Notice("Không thể mở hộp thoại xác nhận. Từ chối thao tác để an toàn.");
             return false;
         }
@@ -73,7 +74,7 @@ export class SafetyLayer {
             new Notice(`Đã hoàn tác: ${latest.label}`);
             return true;
         } catch (error) {
-            console.error("[SafetyLayer] undo failed", error);
+            Logger.error("SafetyLayer", "undo failed", error);
             new Notice(`Hoàn tác thất bại: ${(error as Error).message}`);
             return false;
         }

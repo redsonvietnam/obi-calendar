@@ -14,6 +14,7 @@ import { Notice, App } from "obsidian";
 import type ObsidianCalendarAgentPlugin from "./main";
 import { ChatMessage, GeminiContent } from "./types";
 import { PromptModal } from "./PromptModal";
+import { Logger } from "./Logger";
 
 /**
  * ChatPanel manages the chat interface and user interactions
@@ -300,7 +301,7 @@ export class ChatPanel {
             new Notice(`Đã thêm ${files.length} file.`);
             this.fileInputEl.value = "";
         } catch (error) {
-            console.error("[ChatPanel] File upload error:", error);
+            Logger.error("ChatPanel", "File upload error:", error);
             new Notice(`Lỗi tải file: ${(error as Error).message}`);
         }
     }
@@ -379,7 +380,7 @@ export class ChatPanel {
                     imageBase64 = await this.blobToBase64(blob);
                     break;
                 } catch (error) {
-                    console.error("[ChatPanel] Failed to read image:", error);
+                    Logger.error("ChatPanel", "Failed to read image:", error);
                 }
             }
         }
@@ -417,7 +418,7 @@ export class ChatPanel {
             if ((error as Error).name === "AbortError") {
                 this.setStatus("Đã hủy.");
             } else {
-                console.error("[ChatPanel] Send message error:", error);
+                Logger.error("ChatPanel", "Send message error:", error);
                 new Notice(
                     `Lỗi: ${(error as Error).message}`
                 );
@@ -432,7 +433,7 @@ export class ChatPanel {
     /**
      * Render all messages in the chat
      */
-    private async renderMessages(): Promise<void> {
+    public async renderMessages(): Promise<void> {
         this.messagesEl.empty();
 
         if (this.messages.length === 0) {
