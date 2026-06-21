@@ -590,7 +590,7 @@
 
 .oca-calendar-weekdays {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: 40px repeat(7, 1fr);
     border-bottom: 1px solid var(--divider-color);
     flex-shrink: 0;
 }
@@ -607,7 +607,7 @@
 
 .oca-calendar-days {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: 40px repeat(7, 1fr);
     grid-template-rows: repeat(6, 1fr);
     flex: 1;
     overflow: hidden;
@@ -646,6 +646,18 @@
     width: 22px;
     height: 22px;
     display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.oca-today .oca-month-cell-header strong {
+    background-color: var(--interactive-accent);
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
@@ -700,6 +712,29 @@
 
 .oca-month-event-more:hover {
     color: var(--interactive-accent);
+}
+
+/* Week numbers */
+.oca-week-number-header,
+.oca-week-number {
+    padding: 2px 4px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background-color: var(--background-secondary);
+    border-right: 1px solid var(--divider-color);
+    border-bottom: 1px solid var(--divider-color);
+}
+
+.oca-week-number {
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+}
+
+.oca-week-number:hover {
+    background-color: var(--interactive-accent);
+    color: white;
 }
 
 /* Timeline / agenda */

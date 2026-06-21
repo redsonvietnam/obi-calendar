@@ -498,15 +498,34 @@ export class CalendarPanel {
         this.calendarBodyEl.empty();
         const monthGrid = this.calendarBodyEl.createDiv({ cls: "oca-month-grid" });
 
-        // Weekday headers
+        // Weekday headers (with week number column)
         const headerRow = monthGrid.createDiv({ cls: "oca-month-header" });
+        headerRow.createDiv({ cls: "oca-month-header-cell oca-week-number-header", text: "Tuần" });
         for (const dayLabel of WEEKDAY_LABELS) {
             headerRow.createDiv({ cls: "oca-month-header-cell", text: dayLabel });
         }
 
         // Day cells
         const cells = this.buildMonthCells(this.currentDate);
+        let currentWeek = -1;
+
         for (const cell of cells) {
+            const weekNum = this.getWeekNumber(cell.date);
+
+            // Add week number column at start of each week
+            if (weekNum !== currentWeek) {
+                currentWeek = weekNum;
+                const weekEl = monthGrid.createDiv({
+                    cls: "oca-week-number",
+                    text: String(weekNum)
+                });
+                weekEl.addEventListener("click", () => {
+                    this.currentDate = new Date(cell.date);
+                    this.viewMode = "week";
+                    this.render();
+                });
+            }
+
             const cellEl = monthGrid.createDiv({
                 cls: `oca-month-cell ${cell.inCurrentMonth ? "" : "oca-other-month"} ${cell.isToday ? "oca-today" : ""}`
             });
@@ -531,6 +550,17 @@ export class CalendarPanel {
 
             this.dragManager.setupDayDropZone(cellEl, cell.date);
         }
+    }
+
+    /**
+     * Get ISO week number for a date
+     */
+    private getWeekNumber(date: Date): number {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
     }
 
     /**

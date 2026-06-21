@@ -39,6 +39,7 @@ export class ChatPanel {
     private statusEl!: HTMLDivElement;
     private fileInputEl!: HTMLInputElement;
     private attachedFilesEl!: HTMLDivElement;
+    private typingIndicatorEl!: HTMLDivElement;
 
     // Callbacks
     private onSendMessage?: (
@@ -72,6 +73,15 @@ export class ChatPanel {
 
         // Messages container
         this.messagesEl = this.chatPanelEl.createDiv({ cls: "oca-chat-messages" });
+
+        // Typing indicator (hidden by default)
+        this.typingIndicatorEl = this.chatPanelEl.createDiv({
+            cls: "oca-typing-indicator",
+            attr: { style: "display: none;" }
+        });
+        this.typingIndicatorEl.createSpan({ cls: "oca-typing-dot" });
+        this.typingIndicatorEl.createSpan({ cls: "oca-typing-dot" });
+        this.typingIndicatorEl.createSpan({ cls: "oca-typing-dot" });
 
         // Header
         this.renderHeader();
@@ -405,6 +415,7 @@ export class ChatPanel {
 
         this.abortController = new AbortController();
         this.setStatus("Đang suy nghĩ...");
+        this.showTyping();
 
         try {
             if (!this.onSendMessage) {
@@ -425,6 +436,7 @@ export class ChatPanel {
                 this.setStatus("Lỗi.");
             }
         } finally {
+            this.hideTyping();
             this.setSending(false);
             this.abortController = null;
         }
@@ -540,6 +552,28 @@ export class ChatPanel {
     addAssistantMessage(content: string): void {
         this.pushMessage("assistant", content);
         void this.renderMessages();
+    }
+
+    /**
+     * Show typing indicator
+     */
+    showTyping(): void {
+        this.typingIndicatorEl.style.display = "flex";
+        this.scrollToBottom();
+    }
+
+    /**
+     * Hide typing indicator
+     */
+    hideTyping(): void {
+        this.typingIndicatorEl.style.display = "none";
+    }
+
+    /**
+     * Scroll chat to bottom
+     */
+    private scrollToBottom(): void {
+        this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     }
 
     /**
