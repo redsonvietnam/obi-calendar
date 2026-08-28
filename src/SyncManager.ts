@@ -3,6 +3,7 @@ import type ObsidianCalendarAgentPlugin from "./main";
 import { GoogleTasksAPI } from "./GoogleTasksAPI";
 import { GoogleCalendarAPI } from "./GoogleCalendarAPI";
 import { Logger } from "./Logger";
+import { DEFAULT_TIMEZONE } from "./types";
 
 /**
  * SyncManager handles the bidirectional synchronization between Google services and Obsidian.
@@ -89,6 +90,91 @@ export class SyncManager {
         } finally {
             this.endInternalWrite(path);
         }
+    }
+
+    // --- Timezone helpers (no hard-coded zone, uses configured/default) ---
+    private getTimezone(): string {
+        const tz = this.plugin.settings.timezone?.trim();
+        return tz || DEFAULT_TIMEZONE;
+    }
+
+    private getLocalDateString(date: Date): string {
+        // en-CA gives YYYY-MM-DD in target timezone
+        return new Intl.DateTimeFormat("en-CA", {
+            timeZone: this.getTimezone(),
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+        }).format(date);
+    }
+
+    private getLocalTodayString(): string {
+        return this.getLocalDateString(new Date());
+    }
+
+    /**
+     * Convert a wall time (localDate + 00:00:00) in configured timezone to UTC ISO.
+     * Iterative adjustment via Intl to handle arbitrary zones/DST without external lib.
+     */
+    private wallTimeToUtcIso(localDate: string, time: string): string {
+        const [y, m, d] = localDate.split("-").map(Number);
+        const [hh, mm, ss] = time.split(":").map(Number);
+        let utcMs = Date.UTC(y, m - 1, d, hh, mm, ss ?? 0);
+        const tz = this.getTimezone();
+        // Two iterations are enough for fixed-offset zones (Vietnam) and DST transitions
+        for (let i = 0; i < 3; i++) {
+            const fmt = new Intl.DateTimeFormat("en-CA", {
+                timeZone: tz,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: false,
+            });
+            const parts = fmt.formatToParts(new Date(utcMs));
+            const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+            const wy = Number(get("year"));
+            const wmo = Number(get("month"));
+            const wd = Number(get("day"));
+            const wh = Number(get("hour"));
+            const wmi = Number(get("minute"));
+            const ws = Number(get("second"));
+            const wallMsAsUtc = Date.UTC(wy, wmo - 1, wd, wh, wmi, ws);
+            const desiredMsAsUtc = Date.UTC(y, m - 1, d, hh, mm, ss ?? 0);
+            const diff = desiredMsAsUtc - wallMsAsUtc;
+            if (diff === 0) break;
+            utcMs += diff;
+        }
+        return new Date(utcMs).toISOString();
+    }
+
+    private getUtcBoundsForLocalDay(localDate: string): { timeMin: string; timeMax: string } {
+        const timeMin = this.wallTimeToUtcIso(localDate, "00:00:00");
+        // next local day at 00:00 is exclusive upper bound
+        const [y, m, d] = localDate.split("-").map(Number);
+        const dt = new Date(Date.UTC(y, m - 1, d));
+        dt.setUTCDate(dt.getUTCDate() + 1);
+        const nextLocal = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+        const timeMax = this.wallTimeToUtcIso(nextLocal, "00:00:00");
+        return { timeMin, timeMax };
+    }
+
+    /**
+     * Determine calendar date for an event in configured timezone.
+     * - All-day: use start.date directly (Google's date is calendar date, end is exclusive)
+     * - Timed: convert start.dateTime instant to local date via Intl in configured TZ
+     */
+    public getEventLocalDate(event: { start?: { date?: string; dateTime?: string; timeZone?: string } }): string | null {
+        if (!event.start) return null;
+        if (event.start.date) return event.start.date;
+        if (event.start.dateTime) {
+            const d = new Date(event.start.dateTime);
+            if (isNaN(d.getTime())) return null;
+            return this.getLocalDateString(d);
+        }
+        return null;
     }
 
     /**
@@ -225,9 +311,11 @@ export class SyncManager {
 
     /**
      * Synchronizes Google Calendar events to the current Daily Note.
+     * Date boundary is determined in configured timezone (DEFAULT_TIMEZONE fallback),
+     * and UTC bounds are derived from that local day to avoid UTC previous-day drift.
      */
     private async syncCalendar(): Promise<number> {
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const today = this.getLocalTodayString();
         const dailyNotePath = `${this.plugin.settings.dailyNotesFolder}/${today}.md`;
 
         let file: TFile | null = this.plugin.app.vault.getAbstractFileByPath(dailyNotePath) as TFile;
@@ -249,10 +337,11 @@ export class SyncManager {
             }
         }
 
+        const { timeMin, timeMax } = this.getUtcBoundsForLocalDay(today);
         const events = await this.googleCalendarApi.listEvents({
-            timeMin: `${today}T00:00:00Z`,
-            timeMax: `${today}T23:59:59Z`,
-            singleEvents: true
+            timeMin,
+            timeMax,
+            singleEvents: true,
         });
 
         if (events.length === 0) return 0;
