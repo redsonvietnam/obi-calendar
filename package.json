@@ -6,6 +6,7 @@
     "scripts": {
         "build": "node esbuild.config.mjs production",
         "dev": "node esbuild.config.mjs",
+        "check": "tsc --noEmit",
         "build:deploy": "npm run build && copy main.js \"G:\\My Drive\\FezNote\\.obsidian\\plugins\\obsidian-calendar-agent\\main.js\" && copy manifest.json \"G:\\My Drive\\FezNote\\.obsidian\\plugins\\obsidian-calendar-agent\\manifest.json\" && copy styles.css \"G:\\My Drive\\FezNote\\.obsidian\\plugins\\obsidian-calendar-agent\\styles.css\" && copy styles-chat.css \"G:\\My Drive\\FezNote\\.obsidian\\plugins\\obsidian-calendar-agent\\styles-chat.css\" && copy styles-calendar.css \"G:\\My Drive\\FezNote\\.obsidian\\plugins\\obsidian-calendar-agent\\styles-calendar.css\"",
         "test": "jest",
         "test:watch": "jest --watch",
@@ -21,6 +22,7 @@
     "author": "calendar-agent",
     "license": "MIT",
     "devDependencies": {
+        "@types/crypto-js": "^4.2.2",
         "@types/jest": "^30.0.0",
         "@types/node": "^20.14.11",
         "codegraph": "^1.0.0",

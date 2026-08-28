@@ -54,7 +54,7 @@ export class OAuthManager {
                     this.tokenData = null;
                 }
             } else {
-                this.tokenData = storedEncrypted as OAuthTokenData | null;
+                this.tokenData = (storedEncrypted as unknown) as OAuthTokenData | null;
             }
             
             Logger.info("OAuthManager", `Initialized with token data: ${this.tokenData ? "present" : "null"}`);

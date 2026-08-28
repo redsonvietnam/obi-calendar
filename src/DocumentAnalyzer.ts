@@ -77,11 +77,12 @@ export class DocumentAnalyzer {
 
     private async extractTextViaGemini(imageBase64: string): Promise<string> {
         const vaultSnapshot = await this.deps.vaultContext.buildSnapshot();
+        const vaultSnapshotString = JSON.stringify(vaultSnapshot, null, 2);
         const result = await this.deps.geminiAgent.run(
             OCR_PROMPT,
             [],
             this.deps.plugin.settings.timezone,
-            vaultSnapshot,
+            vaultSnapshotString,
             undefined,
             ["list_events", "create_event", "update_event", "delete_event",
              "get_vault_context", "write_vault_note", "append_vault_note",
@@ -134,11 +135,12 @@ export class DocumentAnalyzer {
 
     private async runAnalysisPrompt(enrichedPrompt: string): Promise<DocumentAnalysisResult> {
         const vaultSnapshot = await this.deps.vaultContext.buildSnapshot();
+        const vaultSnapshotString = JSON.stringify(vaultSnapshot, null, 2);
         const result = await this.deps.geminiAgent.run(
             enrichedPrompt,
             [],
             this.deps.plugin.settings.timezone,
-            vaultSnapshot,
+            vaultSnapshotString,
             undefined,
             ["list_events", "create_event", "update_event", "delete_event",
              "get_vault_context", "write_vault_note", "append_vault_note",

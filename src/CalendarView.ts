@@ -203,7 +203,7 @@ export class CalendarView extends ItemView {
                 this.chatPanel.getGeminiHistory(),
                 timezone,
                 vaultSnapshotString,
-                this.chatPanel.getAbortController()
+                this.chatPanel.getAbortController()?.signal
             );
 
             const MAX_HISTORY_TURNS = 20;
@@ -277,6 +277,14 @@ export class CalendarView extends ItemView {
         };
         this.messages.push(message);
         this.chatPanel.renderMessages();
+    }
+
+    /**
+     * Public proxy for plugin to send a message via ChatPanel.
+     * Used by main.ts scanInbox/handleInboxFile flows.
+     */
+    public async sendMessage(text: string, imageBase64?: string): Promise<void> {
+        await this.chatPanel.sendMessage(text, imageBase64);
     }
 
     /**

@@ -434,7 +434,7 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
     async activateInsightsDashboard(): Promise<void> {
         try {
             const { workspace } = this.app;
-            let leaf = workspace.getLeavesOfType(VIEW_TYPE_INSIGHTS_DASHBOARD)[0] ?? null;
+            let leaf: WorkspaceLeaf | null = workspace.getLeavesOfType(VIEW_TYPE_INSIGHTS_DASHBOARD)[0] ?? null;
             if (!leaf) {
                 leaf = workspace.getRightLeaf(false);
                 if (!leaf) {

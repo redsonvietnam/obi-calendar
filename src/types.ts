@@ -58,6 +58,10 @@ export const DEFAULT_SETTINGS: CalendarAgentSettings = {
     },
 };
 
+export type CalendarViewMode = "day" | "week" | "month" | "timeline";
+
+export type ActiveTab = "chat" | "calendar" | "tasks";
+
 export type ChatRole = "user" | "assistant" | "system" | "tool" | "proposal";
 
 export interface ChatMessage {

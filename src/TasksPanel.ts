@@ -234,7 +234,7 @@ export class TasksPanel {
     /**
      * Reload tasks from Google Tasks API
      */
-    private async reloadTasks(): Promise<void> {
+    public async reloadTasks(): Promise<void> {
         try {
             // Load task lists
             this.taskLists = await this.plugin.googleTasksApi.listTaskLists({});
