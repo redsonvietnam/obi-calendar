@@ -103,7 +103,7 @@ describe("SyncManager loop prevention", () => {
         // Setup: Google has completed task, Obsidian file has unchecked task with same tag
         const mockFile: any = { path: "tasks.md", basename: "tasks", extension: "md", stat: { mtime: 1 } };
         mockPlugin.app.vault.getMarkdownFiles.mockReturnValue([mockFile]);
-        mockPlugin.app.vault.read.mockResolvedValue("- [ ] Do thing ^gtask-abc123");
+        mockPlugin.app.vault.read.mockResolvedValue("- [ ] Do thing ^gtask~list-1~abc123");
         mockGoogleTasksApi.listTaskLists.mockResolvedValue([{ id: "list-1" } as any]);
         mockGoogleTasksApi.listTasks.mockResolvedValue([{ id: "abc123", status: "completed" } as any]);
 
@@ -124,7 +124,7 @@ describe("SyncManager loop prevention", () => {
         expect(manager.getInternalWriteCount("tasks.md")).toBe(1);
 
         // Simulate vault firing modify event for same file while internal write in-flight
-        mockPlugin.app.vault.read.mockResolvedValueOnce("- [x] Do thing ^gtask-abc123");
+        mockPlugin.app.vault.read.mockResolvedValueOnce("- [x] Do thing ^gtask~list-1~abc123");
         mockGoogleTasksApi.getTask.mockClear();
         mockGoogleTasksApi.patchTask.mockClear();
         await listener({ path: "tasks.md", extension: "md" });
@@ -146,13 +146,13 @@ describe("SyncManager loop prevention", () => {
         // No internal write active
         expect(manager.getInternalWriteCount("notes.md")).toBe(0);
 
-        mockPlugin.app.vault.read.mockResolvedValue("- [x] Done ^gtask-xyz");
+        mockPlugin.app.vault.read.mockResolvedValue("- [x] Done ^gtask~list-1~xyz");
         mockGoogleTasksApi.getTask.mockResolvedValue({ id: "xyz", status: "needsAction" } as any);
 
         await listener({ path: "notes.md", extension: "md" });
 
-        expect(mockGoogleTasksApi.getTask).toHaveBeenCalledWith("@default", "xyz");
-        expect(mockGoogleTasksApi.patchTask).toHaveBeenCalledWith("@default", "xyz", { status: "completed" });
+        expect(mockGoogleTasksApi.getTask).toHaveBeenCalledWith("list-1", "xyz");
+        expect(mockGoogleTasksApi.patchTask).toHaveBeenCalledWith("list-1", "xyz", { status: "completed" });
     });
 
     test("Test C: concurrent internal writes for different files do not interfere", async () => {
@@ -161,8 +161,8 @@ describe("SyncManager loop prevention", () => {
         mockPlugin.app.vault.getMarkdownFiles.mockReturnValue([fileA, fileB]);
         // Both files contain tags for two different tasks
         mockPlugin.app.vault.read.mockImplementation((file: any) => {
-            if (file.path === "a.md") return Promise.resolve("- [ ] Task A ^gtask-aaa");
-            if (file.path === "b.md") return Promise.resolve("- [ ] Task B ^gtask-bbb");
+            if (file.path === "a.md") return Promise.resolve("- [ ] Task A ^gtask~list-1~aaa");
+            if (file.path === "b.md") return Promise.resolve("- [ ] Task B ^gtask~list-1~bbb");
             return Promise.resolve("");
         });
         mockGoogleTasksApi.listTaskLists.mockResolvedValue([{ id: "list-1" } as any]);
@@ -200,7 +200,7 @@ describe("SyncManager loop prevention", () => {
         expect(manager.getInternalWriteCount("b.md")).toBe(1);
 
         // Listener for a.md should be suppressed, for other file c.md not
-        mockPlugin.app.vault.read.mockResolvedValue("- [x] X ^gtask-xyz");
+        mockPlugin.app.vault.read.mockResolvedValue("- [x] X ^gtask~list-1~xyz");
         mockGoogleTasksApi.getTask.mockClear();
         mockGoogleTasksApi.patchTask.mockClear();
         await listener({ path: "a.md", extension: "md" });
@@ -236,7 +236,7 @@ describe("SyncManager loop prevention", () => {
     test("Test D: suppression cleared after internal write completes", async () => {
         const file: any = { path: "d.md", basename: "d", extension: "md", stat: { mtime: 1 } };
         mockPlugin.app.vault.getMarkdownFiles.mockReturnValue([file]);
-        mockPlugin.app.vault.read.mockResolvedValue("- [ ] T ^gtask-d1");
+        mockPlugin.app.vault.read.mockResolvedValue("- [ ] T ^gtask~list-1~d1");
         mockGoogleTasksApi.listTaskLists.mockResolvedValue([{ id: "list-1" } as any]);
         mockGoogleTasksApi.listTasks.mockResolvedValue([{ id: "d1", status: "completed" } as any]);
 
@@ -244,7 +244,7 @@ describe("SyncManager loop prevention", () => {
         expect(manager.getInternalWriteCount("d.md")).toBe(0);
 
         // Now user edit should trigger
-        mockPlugin.app.vault.read.mockResolvedValue("- [x] T ^gtask-d1");
+        mockPlugin.app.vault.read.mockResolvedValue("- [x] T ^gtask~list-1~d1");
         mockGoogleTasksApi.getTask.mockResolvedValue({ id: "d1", status: "needsAction" } as any);
         mockGoogleTasksApi.patchTask.mockClear();
         await listener({ path: "d.md", extension: "md" });
@@ -254,7 +254,7 @@ describe("SyncManager loop prevention", () => {
     test("Test E: suppression cleaned up even when internal write fails", async () => {
         const file: any = { path: "e.md", basename: "e", extension: "md", stat: { mtime: 1 } };
         mockPlugin.app.vault.getMarkdownFiles.mockReturnValue([file]);
-        mockPlugin.app.vault.read.mockResolvedValue("- [ ] T ^gtask-e1");
+        mockPlugin.app.vault.read.mockResolvedValue("- [ ] T ^gtask~list-1~e1");
         mockGoogleTasksApi.listTaskLists.mockResolvedValue([{ id: "list-1" } as any]);
         mockGoogleTasksApi.listTasks.mockResolvedValue([{ id: "e1", status: "completed" } as any]);
         mockPlugin.app.vault.modify.mockRejectedValue(new Error("disk full"));
@@ -265,7 +265,7 @@ describe("SyncManager loop prevention", () => {
         expect(result.errors.length).toBeGreaterThanOrEqual(0);
 
         // Subsequent user edit must still be processed
-        mockPlugin.app.vault.read.mockResolvedValue("- [x] T ^gtask-e1");
+        mockPlugin.app.vault.read.mockResolvedValue("- [x] T ^gtask~list-1~e1");
         mockGoogleTasksApi.getTask.mockResolvedValue({ id: "e1", status: "needsAction" } as any);
         mockGoogleTasksApi.patchTask.mockClear();
         await listener({ path: "e.md", extension: "md" });
@@ -282,7 +282,7 @@ describe("SyncManager loop prevention", () => {
         (manager as any).endInternalWrite("same.md");
         expect(manager.getInternalWriteCount("same.md")).toBe(1);
         // Still suppressed
-        mockPlugin.app.vault.read.mockResolvedValue("- [x] T ^gtask-z");
+        mockPlugin.app.vault.read.mockResolvedValue("- [x] T ^gtask~list-1~z");
         mockGoogleTasksApi.getTask.mockClear();
         mockGoogleTasksApi.patchTask.mockClear();
         await listener({ path: "same.md", extension: "md" });

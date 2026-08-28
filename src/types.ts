@@ -145,6 +145,7 @@ export interface GoogleTask {
     status?: "needsAction" | "completed";
     due?: string; // RFC3339
     completed?: string; // RFC3339
+    tasklist?: string; // Task list ID (Google Tasks API field)
 }
 
 export interface GoogleTaskList {

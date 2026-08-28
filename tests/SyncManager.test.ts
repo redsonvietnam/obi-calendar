@@ -188,10 +188,10 @@ describe("SyncManager", () => {
             };
             
             mockPlugin.app.vault.getMarkdownFiles.mockReturnValue([mockFile]);
-            mockPlugin.app.vault.read.mockResolvedValue("- [ ] Task 1 ^gtask-123\n- [x] Task 2");
+            mockPlugin.app.vault.read.mockResolvedValue("- [ ] Task 1 ^gtask~listA~123\n- [x] Task 2");
             mockPlugin.app.vault.modify.mockResolvedValue(undefined);
             
-            mockGoogleTasksApi.listTaskLists.mockResolvedValue([{ id: "list-1" }]);
+            mockGoogleTasksApi.listTaskLists.mockResolvedValue([{ id: "listA", title: "List A" }]);
             mockGoogleTasksApi.listTasks.mockResolvedValue([
                 { id: "123", status: "completed", title: "Task 1" }
             ]);
@@ -305,7 +305,7 @@ describe("SyncManager", () => {
             const listener = mockPlugin.app.vault.on.mock.calls[0][1];
             
             // Mock the vault read for the file with completed task tag
-            mockPlugin.app.vault.read.mockResolvedValue("- [x] Task ^gtask-abc123");
+            mockPlugin.app.vault.read.mockResolvedValue("- [x] Task ^gtask~listA~abc123");
             mockGoogleTasksApi.getTask.mockResolvedValue({ id: "abc123", status: "needsAction" });
             mockGoogleTasksApi.patchTask.mockResolvedValue(undefined);
             
@@ -313,8 +313,8 @@ describe("SyncManager", () => {
             await listener(mockFile);
             
             // Verify Google Task was updated (completed in Obsidian, needsAction in Google)
-            expect(mockGoogleTasksApi.getTask).toHaveBeenCalledWith("@default", "abc123");
-            expect(mockGoogleTasksApi.patchTask).toHaveBeenCalledWith("@default", "abc123", { status: "completed" });
+            expect(mockGoogleTasksApi.getTask).toHaveBeenCalledWith("listA", "abc123");
+            expect(mockGoogleTasksApi.patchTask).toHaveBeenCalledWith("listA", "abc123", { status: "completed" });
         });
     });
 });

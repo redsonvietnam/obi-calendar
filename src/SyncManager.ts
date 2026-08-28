@@ -258,7 +258,7 @@ export class SyncManager {
 
     /**
      * Synchronizes Google Tasks status back to Obsidian.
-     * Looks for tasks marked with ^gtask-ID.
+     * Preserves task list identity: stores ^gtask-{listId}-{taskId}
      */
     private async syncTasks(): Promise<number> {
         const lists = await this.googleTasksApi.listTaskLists();
@@ -270,7 +270,7 @@ export class SyncManager {
             for (const task of tasks) {
                 if (!task.id) continue;
 
-                const taskIdTag = `^gtask-${task.id}`;
+                const taskIdTag = `^gtask~${list.id}~${task.id}`;
                 const files = this.plugin.app.vault.getMarkdownFiles();
 
                 for (const file of files) {
@@ -307,6 +307,25 @@ export class SyncManager {
             }
         }
         return totalUpdated;
+    }
+
+    /**
+     * Parses a task tag and extracts list ID and task ID.
+     * Returns null if tag format doesn't match (legacy or malformed).
+     */
+    public parseTaskTag(tag: string): { tasklistId: string; taskId: string } | null {
+        // New format: ^gtask~{listId}~{taskId}
+        const match = tag.match(/^\^gtask~([^~]+)~(.+)$/);
+        if (!match) return null;
+        return { tasklistId: match[1], taskId: match[2] };
+    }
+
+    /**
+     * Finds legacy task ID from old format ^gtask-{taskId} for backward compatibility.
+     */
+    public extractLegacyTaskId(line: string): string | null {
+        const match = line.match(/\^gtask-([a-zA-Z0-9_-]+)/);
+        return match ? match[1] : null;
     }
 
     /**
@@ -380,6 +399,7 @@ export class SyncManager {
     /**
      * Synchronizes Obsidian tasks to Google Tasks.
      * Listens for file modifications and updates Google Tasks accordingly.
+     * Uses preserved task list identity from task tag format.
      */
     private async syncObsidianTasksToGoogle(file: TFile): Promise<number> {
         const content = await this.plugin.app.vault.read(file);
@@ -388,38 +408,53 @@ export class SyncManager {
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            const taskTagMatch = line.match(/\^gtask-([a-zA-Z0-9_-]+)/);
+        const taskTagMatch = line.match(/\^gtask[~-][^\s]+/);
 
             if (taskTagMatch) {
-                const taskId = taskTagMatch[1];
+                const fullTag = taskTagMatch[0];
+                const parsed = this.parseTaskTag(fullTag);
+
+                let listId: string;
+                let taskId: string;
+
+                if (parsed) {
+                    listId = parsed.tasklistId;
+                    taskId = parsed.taskId;
+                } else {
+                    // Legacy format: ^gtask-{taskId} without list ID
+                    const legacyTaskId = this.extractLegacyTaskId(fullTag);
+                    if (!legacyTaskId) continue;
+                    listId = "@default";
+                    taskId = legacyTaskId;
+                }
+
                 const isCompletedInObsidian = line.includes('[x]');
                 const needsActionInObsidian = line.includes('[ ]');
 
                 if (isCompletedInObsidian || needsActionInObsidian) {
                     try {
                         // Fetch the current task status from Google Tasks to avoid unnecessary updates
-                        // Assuming default tasklist for now. This might need to be configurable.
-                        const task = await this.googleTasksApi.getTask("@default", taskId);
+                        const task = await this.googleTasksApi.getTask(listId, taskId);
 
                         if (task) {
                             const googleStatus = task.status; // 'completed' or 'needsAction'
 
                             if (isCompletedInObsidian && googleStatus !== 'completed') {
-                                await this.googleTasksApi.patchTask("@default", taskId, {
+                                await this.googleTasksApi.patchTask(listId, taskId, {
                                     status: 'completed'
                                 });
                                 updatedCount++;
-                                Logger.debug("SyncManager", `Marked Google Task ${taskId} as completed.`);
+                                Logger.debug("SyncManager", `Marked Google Task ${taskId} (list ${listId}) as completed.`);
                             } else if (needsActionInObsidian && googleStatus !== 'needsAction') {
-                                await this.googleTasksApi.patchTask("@default", taskId, {
+                                await this.googleTasksApi.patchTask(listId, taskId, {
                                     status: 'needsAction'
                                 });
                                 updatedCount++;
-                                Logger.debug("SyncManager", `Marked Google Task ${taskId} as needsAction.`);
+                                Logger.debug("SyncManager", `Marked Google Task ${taskId} (list ${listId}) as needsAction.`);
                             }
                         }
                     } catch (error) {
-                        Logger.error("SyncManager", `Failed to update Google Task ${taskId} for file ${file.path}`, error);
+                        Logger.error("SyncManager", `Failed to update Google Task ${taskId} (list ${listId}) for file ${file.path}`, error);
                         // Optionally add error to a results array if needed
                     }
                 }
