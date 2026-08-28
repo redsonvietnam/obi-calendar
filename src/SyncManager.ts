@@ -14,6 +14,7 @@ export class SyncManager {
     private googleCalendarApi: GoogleCalendarAPI;
     private syncTimer?: number;
     private fileModifyListener?: (file: any) => Promise<void>; // To store the listener for unregistration
+    private internalWrites: Map<string, number> = new Map();
 
     constructor(plugin: ObsidianCalendarAgentPlugin, googleTasksApi: GoogleTasksAPI, googleCalendarApi: GoogleCalendarAPI) {
         this.plugin = plugin;
@@ -31,6 +32,7 @@ export class SyncManager {
 
     /**
      * Registers the listener for file modifications to sync Obsidian tasks to Google.
+     * Suppression: ignores events for files currently under internal Google→Obsidian write.
      */
     private registerFileModificationListener(): void {
         // Ensure listener is not already registered
@@ -41,6 +43,10 @@ export class SyncManager {
         this.fileModifyListener = async (file: any) => {
             // Only process markdown files
             if (file && file.extension === "md") {
+                if (this.isInternalWrite(file.path as string)) {
+                    Logger.debug("SyncManager", `Ignoring internal write for ${file.path}`);
+                    return;
+                }
                 try {
                     await this.syncObsidianTasksToGoogle(file as TFile);
                 } catch (error) {
@@ -50,6 +56,39 @@ export class SyncManager {
         };
         this.plugin.app.vault.on("modify", this.fileModifyListener as any);
         Logger.info("SyncManager", "File modification listener registered.");
+    }
+
+    private beginInternalWrite(path: string): void {
+        const count = this.internalWrites.get(path) ?? 0;
+        this.internalWrites.set(path, count + 1);
+    }
+
+    private endInternalWrite(path: string): void {
+        const count = this.internalWrites.get(path);
+        if (count === undefined) return;
+        if (count <= 1) {
+            this.internalWrites.delete(path);
+        } else {
+            this.internalWrites.set(path, count - 1);
+        }
+    }
+
+    private isInternalWrite(path: string): boolean {
+        return this.internalWrites.has(path);
+    }
+
+    /** Visible for testing – returns current suppression count for a path. */
+    public getInternalWriteCount(path: string): number {
+        return this.internalWrites.get(path) ?? 0;
+    }
+
+    private async withInternalWrite<T>(path: string, fn: () => Promise<T>): Promise<T> {
+        this.beginInternalWrite(path);
+        try {
+            return await fn();
+        } finally {
+            this.endInternalWrite(path);
+        }
     }
 
     /**
@@ -172,7 +211,9 @@ export class SyncManager {
                         }
 
                         if (modified) {
-                            await this.plugin.app.vault.modify(file, lines.join('\n'));
+                            await this.withInternalWrite(file.path, async () => {
+                                await this.plugin.app.vault.modify(file, lines.join('\n'));
+                            });
                             totalUpdated++;
                         }
                     }
@@ -233,12 +274,16 @@ export class SyncManager {
             const regex = new RegExp(`${sectionMarker}[\\s\\S]*?(?=\\n##|$)`, 'g');
             const newContent = content.replace(regex, eventsSection.trim());
             if (newContent !== content) {
-                await this.plugin.app.vault.modify(file, newContent);
+                await this.withInternalWrite(file.path, async () => {
+                    await this.plugin.app.vault.modify(file, newContent);
+                });
                 return 1;
             }
             return 0;
         } else {
-            await this.plugin.app.vault.modify(file, content + '\n' + eventsSection);
+            await this.withInternalWrite(file.path, async () => {
+                await this.plugin.app.vault.modify(file, content + '\n' + eventsSection);
+            });
             return 1;
         }
     }
