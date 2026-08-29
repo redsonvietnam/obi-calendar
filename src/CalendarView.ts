@@ -73,6 +73,7 @@ export class CalendarView extends ItemView {
     async onOpen(): Promise<void> {
         this.initComponents();
         this.renderLayout();
+        this.restorePersistedState();
         this.switchTab("chat");
     }
 
@@ -131,6 +132,12 @@ export class CalendarView extends ItemView {
     }
 
     private lastProposalId: string | null = null;
+
+    private restorePersistedState(): void {
+        // View mode persistence is handled in CalendarPanel restorePersistedState
+        // Current date persistence is handled in CalendarPanel restorePersistedState
+        // The CalendarView simply triggers the panel init which restores state
+    }
 
     /**
      * Render the main layout and tab structure

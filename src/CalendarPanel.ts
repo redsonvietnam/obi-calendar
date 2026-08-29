@@ -25,6 +25,13 @@ interface CalendarDayCell {
     events: GoogleCalendarEvent[];
 }
 
+// Persistence keys
+const CALENDAR_VIEWMODE_KEY = "calendar_view_mode";
+const CALENDAR_CURRENTDATE_KEY = "calendar_current_date";
+
+// Valid view mode values
+const VALID_VIEW_MODES: CalendarViewMode[] = ["day", "week", "month", "timeline"];
+
 const HOUR_HEIGHT = 60;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
@@ -65,6 +72,37 @@ export class CalendarPanel {
         this.plugin = plugin;
         this.app = app;
         this.dragManager = new DragManager(plugin);
+        // Restore persisted state
+        this.restorePersistedState();
+    }
+
+    /** Restore viewMode and currentDate from localStorage if available. */
+    private restorePersistedState(): void {
+        // Restore viewMode
+        const storedViewMode = localStorage.getItem(CALENDAR_VIEWMODE_KEY) as CalendarViewMode | null;
+        if (storedViewMode && VALID_VIEW_MODES.includes(storedViewMode as CalendarViewMode)) {
+            this.viewMode = storedViewMode;
+        } else {
+            // fallback to default
+            this.viewMode = "month";
+            localStorage.setItem(CALENDAR_VIEWMODE_KEY, "month");
+        }
+
+        // Restore currentDate
+        const storedDateStr = localStorage.getItem(CALENDAR_CURRENTDATE_KEY) as string | null;
+        if (storedDateStr) {
+            const parsed = new Date(storedDateStr);
+            if (!isNaN(parsed.getTime())) {
+                this.currentDate = parsed;
+            }
+        }
+        // If no valid stored date, currentDate stays as new Date() (already set)
+    }
+
+    /** Save viewMode and currentDate to localStorage. */
+    private savePersistedState(): void {
+        localStorage.setItem(CALENDAR_VIEWMODE_KEY, this.viewMode);
+        localStorage.setItem(CALENDAR_CURRENTDATE_KEY, this.currentDate.toISOString());
     }
 
     /**
@@ -126,6 +164,13 @@ export class CalendarPanel {
             text: "↻",
             cls: "oca-nav-btn"
         });
+        const modeBar = wrap.createDiv({ cls: "oca-view-modes" });
+        // ... rest of existing render code
+
+        // Show loading state if loading
+        if (this.isLoadingCalendar) {
+            wrap.createEl("p", "Đang tải sự kiện...");
+        }
 
         prevBtn.addEventListener("click", () => this.navigatePrev());
         todayBtn.addEventListener("click", () => this.navigateToday());
@@ -135,7 +180,6 @@ export class CalendarPanel {
         });
 
         // View mode selector
-        const modeBar = wrap.createDiv({ cls: "oca-view-modes" });
         const modes: Array<{ mode: CalendarViewMode; label: string }> = [
             { mode: "day", label: "Ngày" },
             { mode: "week", label: "Tuần" },
@@ -315,6 +359,7 @@ export class CalendarPanel {
                     maxResults: 250
                 });
 
+            this.savePersistedState();
             this.renderCalendarView();
         } catch (error) {
             Logger.error("CalendarPanel", "Failed to load events:", error);
