@@ -264,6 +264,22 @@ export class SyncManager {
         const lists = await this.googleTasksApi.listTaskLists();
         let totalUpdated = 0;
 
+        const files = this.plugin.app.vault.getMarkdownFiles();
+        if (files.length === 0) return 0;
+
+        // Pre-load file contents once; index by tag -> file
+        const tagToFile = new Map<string, TFile[]>();
+        for (const file of files) {
+            const content = await this.plugin.app.vault.read(file);
+            const tagMatches = content.match(/\^gtask[~-][^\s]+/g);
+            if (!tagMatches) continue;
+            for (const tag of tagMatches) {
+                const arr = tagToFile.get(tag) ?? [];
+                arr.push(file);
+                tagToFile.set(tag, arr);
+            }
+        }
+
         for (const list of lists) {
             const tasks = await this.googleTasksApi.listTasks({ tasklist: list.id });
 
@@ -271,37 +287,35 @@ export class SyncManager {
                 if (!task.id) continue;
 
                 const taskIdTag = `^gtask~${list.id}~${task.id}`;
-                const files = this.plugin.app.vault.getMarkdownFiles();
+                const matchingFiles = tagToFile.get(taskIdTag);
+                if (!matchingFiles || matchingFiles.length === 0) continue;
 
-                for (const file of files) {
+                for (const file of matchingFiles) {
                     const content = await this.plugin.app.vault.read(file);
-                    if (content.includes(taskIdTag)) {
-                        const isCompletedInGoogle = task.status === "completed";
-                        const lines = content.split('\n');
-                        let modified = false;
+                    const isCompletedInGoogle = task.status === "completed";
+                    const lines = content.split('\n');
+                    let modified = false;
 
-                        for (let i = 0; i < lines.length; i++) {
-                            if (lines[i].includes(taskIdTag)) {
-                                const line = lines[i];
-                                // Check if it's a task line and if status differs
-                                if (line.trim().startsWith('- [') || line.trim().startsWith('* [') || line.trim().startsWith('+ [')) {
-                                    const currentStatusInObsidian = line.includes('[x]') ? 'completed' : 'needsAction';
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].includes(taskIdTag)) {
+                            const line = lines[i];
+                            if (line.trim().startsWith('- [') || line.trim().startsWith('* [') || line.trim().startsWith('+ [')) {
+                                const currentStatusInObsidian = line.includes('[x]') ? 'completed' : 'needsAction';
 
-                                    if (currentStatusInObsidian !== task.status) {
-                                        const newStatus = isCompletedInGoogle ? '[x]' : '[ ]';
-                                        lines[i] = line.replace(/\[.\]/, newStatus);
-                                        modified = true;
-                                    }
+                                if (currentStatusInObsidian !== task.status) {
+                                    const newStatus = isCompletedInGoogle ? '[x]' : '[ ]';
+                                    lines[i] = line.replace(/\[.\]/, newStatus);
+                                    modified = true;
                                 }
                             }
                         }
+                    }
 
-                        if (modified) {
-                            await this.withInternalWrite(file.path, async () => {
-                                await this.plugin.app.vault.modify(file, lines.join('\n'));
-                            });
-                            totalUpdated++;
-                        }
+                    if (modified) {
+                        await this.withInternalWrite(file.path, async () => {
+                            await this.plugin.app.vault.modify(file, lines.join('\n'));
+                        });
+                        totalUpdated++;
                     }
                 }
             }
