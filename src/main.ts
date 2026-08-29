@@ -63,7 +63,7 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
             });
             this.geminiAgent = new GeminiAgent(this, this.calendarTools);
             this.syncManager = new SyncManager(this, this.googleTasksApi, this.googleCalendarApi);
-            this.syncManager.startAutoSync();
+            this.syncManager.initialize();
 
             this.analysisHistory = new AnalysisHistory(this);
             await this.analysisHistory.initialize();
@@ -321,6 +321,9 @@ export default class ObsidianCalendarAgentPlugin extends Plugin {
 
     async onunload(): Promise<void> {
         try {
+            if (this.syncManager) {
+                this.syncManager.stop();
+            }
             await this.app.workspace.detachLeavesOfType(VIEW_TYPE_CALENDAR_AGENT);
         } catch (error) {
             Logger.error("Main", "onunload failed", error);

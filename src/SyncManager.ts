@@ -14,6 +14,7 @@ export class SyncManager {
     private googleTasksApi: GoogleTasksAPI;
     private googleCalendarApi: GoogleCalendarAPI;
     private syncTimer?: number;
+    private syncInProgress: boolean = false;
     private fileModifyListener?: (file: any) => Promise<void>; // To store the listener for unregistration
     private internalWrites: Map<string, number> = new Map();
 
@@ -224,36 +225,47 @@ export class SyncManager {
      * Obsidian -> Google sync is handled by the file modification listener.
      */
     async syncAll(): Promise<{ tasksUpdated: number; calendarUpdated: number; errors: string[] }> {
-        Logger.info("SyncManager", "Starting full sync (Google -> Obsidian)...");
-        const results = {
-            tasksUpdated: 0, // Google -> Obsidian tasks
-            calendarUpdated: 0,
-            errors: [] as string[]
-        };
+        if (this.syncInProgress) {
+            Logger.info("SyncManager", "Sync already in progress, skipping this cycle.");
+            return { tasksUpdated: 0, calendarUpdated: 0, errors: [] };
+        }
+        this.syncInProgress = true;
+        try {
+            Logger.info("SyncManager", "Starting full sync (Google -> Obsidian)...");
+            const results = {
+                tasksUpdated: 0,
+                calendarUpdated: 0,
+                errors: [] as string[]
+            };
 
-        if (this.plugin.settings.sync.syncTasks) {
-            try {
-                results.tasksUpdated = await this.syncTasks(); // Google -> Obsidian
-            } catch (e) {
-                results.errors.push(`Tasks sync (Google -> Obsidian) failed: ${(e as Error).message}`);
+            if (this.plugin.settings.sync.syncTasks) {
+                try {
+                    results.tasksUpdated = await this.syncTasks();
+                } catch (e) {
+                    results.errors.push(`Tasks sync (Google -> Obsidian) failed: ${(e as Error).message}`);
+                }
             }
-        }
 
-        if (this.plugin.settings.sync.syncCalendar) {
-            try {
-                results.calendarUpdated = await this.syncCalendar(); // Google Calendar -> Obsidian Daily Note
-            } catch (e) {
-                results.errors.push(`Calendar sync (Google -> Obsidian) failed: ${(e as Error).message}`);
+            if (this.plugin.settings.sync.syncCalendar) {
+                try {
+                    results.calendarUpdated = await this.syncCalendar();
+                } catch (e) {
+                    results.errors.push(`Calendar sync (Google -> Obsidian) failed: ${(e as Error).message}`);
+                }
             }
-        }
 
-        if (results.errors.length > 0) {
-            Logger.error("SyncManager", "Sync completed with errors:", results.errors);
-        } else {
-            Logger.info("SyncManager", `Sync completed. Tasks updated: ${results.tasksUpdated}, Calendar updated: ${results.calendarUpdated}`);
-        }
+            if (results.errors.length > 0) {
+                Logger.error("SyncManager", "Sync completed with errors:", results.errors);
+            }
+            else {
+                Logger.info("SyncManager", `Sync completed. Tasks updated: ${results.tasksUpdated}, Calendar updated: ${results.calendarUpdated}`);
+            }
 
-        return results;
+            return results;
+        }
+        finally {
+            this.syncInProgress = false;
+        }
     }
 
     /**
@@ -267,10 +279,12 @@ export class SyncManager {
         const files = this.plugin.app.vault.getMarkdownFiles();
         if (files.length === 0) return 0;
 
-        // Pre-load file contents once; index by tag -> file
+        // Pre-load file contents once; index by tag -> file, cache content by file
         const tagToFile = new Map<string, TFile[]>();
+        const fileContentCache = new Map<TFile, string>();
         for (const file of files) {
             const content = await this.plugin.app.vault.read(file);
+            fileContentCache.set(file, content);
             const tagMatches = content.match(/\^gtask[~-][^\s]+/g);
             if (!tagMatches) continue;
             for (const tag of tagMatches) {
@@ -291,7 +305,7 @@ export class SyncManager {
                 if (!matchingFiles || matchingFiles.length === 0) continue;
 
                 for (const file of matchingFiles) {
-                    const content = await this.plugin.app.vault.read(file);
+                    const content = fileContentCache.get(file) ?? await this.plugin.app.vault.read(file);
                     const isCompletedInGoogle = task.status === "completed";
                     const lines = content.split('\n');
                     let modified = false;
@@ -312,8 +326,10 @@ export class SyncManager {
                     }
 
                     if (modified) {
+                        const newContent = lines.join('\n');
+                        fileContentCache.set(file, newContent);
                         await this.withInternalWrite(file.path, async () => {
-                            await this.plugin.app.vault.modify(file, lines.join('\n'));
+                            await this.plugin.app.vault.modify(file, newContent);
                         });
                         totalUpdated++;
                     }
